@@ -1,12 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
 import { analyticsService } from '../services/analytics.service.js';
 
-interface AuthRequest extends Request {
-  user?: { userId: string; email: string; role: string };
-}
-
 export const getOverviewAnalytics = async (
-  req: AuthRequest,
+  req: Request,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
@@ -33,7 +29,7 @@ export const getOverviewAnalytics = async (
 };
 
 export const getCampaignAnalytics = async (
-  req: AuthRequest,
+  req: Request,
   res: Response,
   next: NextFunction
 ): Promise<void> => {

@@ -2,16 +2,11 @@ import { Request, Response, NextFunction } from 'express';
 import { campaignService } from '../services/campaign.service.js';
 import { CampaignStatus, CampaignInfluencerStatus } from '@prisma/client';
 
-// Extend Request type to include user
-interface AuthRequest extends Request {
-  user?: { userId: string; email: string; role: string };
-}
-
 // ==================== Campaign CRUD Endpoints ====================
 
 // Create a campaign
 export const createCampaign = async (
-  req: AuthRequest,
+  req: Request,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
@@ -62,7 +57,7 @@ export const createCampaign = async (
 
 // Get a single campaign
 export const getCampaign = async (
-  req: AuthRequest,
+  req: Request,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
@@ -92,7 +87,7 @@ export const getCampaign = async (
 
 // Get all campaigns with filters
 export const getCampaigns = async (
-  req: AuthRequest,
+  req: Request,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
@@ -134,7 +129,7 @@ export const getCampaigns = async (
 
 // Update a campaign
 export const updateCampaign = async (
-  req: AuthRequest,
+  req: Request,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
@@ -192,7 +187,7 @@ export const updateCampaign = async (
 
 // Delete a campaign
 export const deleteCampaign = async (
-  req: AuthRequest,
+  req: Request,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
@@ -222,7 +217,7 @@ export const deleteCampaign = async (
 
 // Duplicate a campaign
 export const duplicateCampaign = async (
-  req: AuthRequest,
+  req: Request,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
@@ -254,7 +249,7 @@ export const duplicateCampaign = async (
 
 // Get campaign stats
 export const getCampaignStats = async (
-  req: AuthRequest,
+  req: Request,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
@@ -280,7 +275,7 @@ export const getCampaignStats = async (
 
 // Add influencer to campaign
 export const addInfluencerToCampaign = async (
-  req: AuthRequest,
+  req: Request,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
@@ -322,7 +317,7 @@ export const addInfluencerToCampaign = async (
 
 // Get campaign influencers
 export const getCampaignInfluencers = async (
-  req: AuthRequest,
+  req: Request,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
@@ -352,7 +347,7 @@ export const getCampaignInfluencers = async (
 
 // Update campaign influencer
 export const updateCampaignInfluencer = async (
-  req: AuthRequest,
+  req: Request,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
@@ -391,7 +386,7 @@ export const updateCampaignInfluencer = async (
 
 // Remove influencer from campaign
 export const removeInfluencerFromCampaign = async (
-  req: AuthRequest,
+  req: Request,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
@@ -423,7 +418,7 @@ export const removeInfluencerFromCampaign = async (
 
 // Get campaign activities
 export const getCampaignActivities = async (
-  req: AuthRequest,
+  req: Request,
   res: Response,
   next: NextFunction
 ): Promise<void> => {

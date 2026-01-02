@@ -25,6 +25,7 @@ import csvImportExportRoutes from './routes/csvImportExport.routes.js';
 import paymentRoutes from './routes/payment.routes.js';
 import messagingRoutes from './routes/messaging.routes.js';
 import contentApprovalRoutes from './routes/contentApproval.routes.js';
+import shopifyRoutes from './routes/shopify.routes.js';
 
 const app: Express = express();
 
@@ -45,6 +46,9 @@ app.use(limiter);
 
 // Stripe webhook needs raw body - must be before JSON parser
 app.use(`${config.apiPrefix}/payments/webhook`, express.raw({ type: 'application/json' }));
+
+// Shopify webhook needs raw body - must be before JSON parser
+app.use(`${config.apiPrefix}/shopify/webhook`, express.raw({ type: 'application/json' }));
 
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
@@ -85,6 +89,7 @@ app.use(`${config.apiPrefix}/csv`, csvImportExportRoutes);
 app.use(`${config.apiPrefix}/payments`, paymentRoutes);
 app.use(`${config.apiPrefix}/messaging`, messagingRoutes);
 app.use(`${config.apiPrefix}/content`, contentApprovalRoutes);
+app.use(`${config.apiPrefix}/shopify`, shopifyRoutes);
 
 // Error handling
 app.use(notFoundHandler);

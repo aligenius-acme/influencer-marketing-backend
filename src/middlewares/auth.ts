@@ -1,4 +1,4 @@
-import { Request, Response, NextFunction } from 'express';
+import { Request, Response, NextFunction, RequestHandler } from 'express';
 import jwt from 'jsonwebtoken';
 import { config } from '../config/index.js';
 import { UnauthorizedError, ForbiddenError } from './errorHandler.js';
@@ -11,12 +11,12 @@ export interface JwtPayload {
   exp: number;
 }
 
-export interface AuthenticatedRequest extends Request {
-  user?: JwtPayload;
-}
+// Use Request directly - Express.User is extended in src/types/express.d.ts
+export type AuthenticatedRequest = Request;
 
-export const authenticate = async (
-  req: AuthenticatedRequest,
+// Type-safe middleware wrapper for Express 5 compatibility
+const authMiddleware = async (
+  req: Request,
   _res: Response,
   next: NextFunction
 ) => {
@@ -45,8 +45,11 @@ export const authenticate = async (
   }
 };
 
-export const authorize = (...roles: string[]) => {
-  return (req: AuthenticatedRequest, _res: Response, next: NextFunction) => {
+// Export as RequestHandler for Express 5 compatibility
+export const authenticate: RequestHandler = authMiddleware as RequestHandler;
+
+export const authorize = (...roles: string[]): RequestHandler => {
+  return ((req: Request, _res: Response, next: NextFunction) => {
     if (!req.user) {
       return next(UnauthorizedError('Authentication required'));
     }
@@ -56,12 +59,12 @@ export const authorize = (...roles: string[]) => {
     }
 
     next();
-  };
+  }) as RequestHandler;
 };
 
 // Optional authentication - doesn't throw if no token
-export const optionalAuth = async (
-  req: AuthenticatedRequest,
+const optionalAuthMiddleware = async (
+  req: Request,
   _res: Response,
   next: NextFunction
 ) => {
@@ -82,3 +85,5 @@ export const optionalAuth = async (
     next();
   }
 };
+
+export const optionalAuth: RequestHandler = optionalAuthMiddleware as RequestHandler;

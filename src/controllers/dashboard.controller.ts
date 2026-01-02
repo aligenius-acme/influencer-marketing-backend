@@ -1,12 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
 import { dashboardService } from '../services/dashboard.service.js';
 
-interface AuthRequest extends Request {
-  user?: { userId: string; email: string; role: string };
-}
-
 export const getDashboardStats = async (
-  req: AuthRequest,
+  req: Request,
   res: Response,
   next: NextFunction
 ): Promise<void> => {

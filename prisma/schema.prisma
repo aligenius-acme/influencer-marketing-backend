@@ -36,6 +36,7 @@ model User {
   emailTemplates          EmailTemplate[]
   subscription            Subscription?
   payments                Payment[]
+  shopifyStore            ShopifyStore?
 
   @@map("users")
 }
@@ -127,9 +128,10 @@ model Campaign {
   updatedAt   DateTime       @updatedAt @map("updated_at")
 
   // Relations
-  user        User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
-  influencers CampaignInfluencer[]
-  activities  CampaignActivity[]
+  user            User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  influencers     CampaignInfluencer[]
+  activities      CampaignActivity[]
+  seedingCampaign SeedingCampaign?
 
   @@map("campaigns")
 }
@@ -159,7 +161,9 @@ model CampaignInfluencer {
   updatedAt           DateTime                  @updatedAt @map("updated_at")
 
   // Relations
-  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  campaign         Campaign          @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  discountCodes    DiscountCode[]
+  seedingShipments SeedingShipment[]
 
   @@map("campaign_influencers")
 }
@@ -273,4 +277,166 @@ enum PaymentStatus {
   SUCCEEDED
   FAILED
   REFUNDED
+}
+
+// ==================== Shopify E-commerce Integration ====================
+
+model ShopifyStore {
+  id          String    @id @default(uuid())
+  userId      String    @unique @map("user_id")
+  shopDomain  String    @unique @map("shop_domain") // mystore.myshopify.com
+  accessToken String    @map("access_token")
+  scope       String    // Granted scopes
+
+  storeName   String?   @map("store_name")
+  storeEmail  String?   @map("store_email")
+  currency    String    @default("USD")
+
+  lastSyncAt  DateTime? @map("last_sync_at")
+  webhookId   String?   @map("webhook_id")
+
+  isActive    Boolean   @default(true) @map("is_active")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  user          User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  products      ShopifyProduct[]
+  discountCodes DiscountCode[]
+
+  @@map("shopify_stores")
+}
+
+model ShopifyProduct {
+  id               String   @id @default(uuid())
+  storeId          String   @map("store_id")
+  shopifyProductId String   @map("shopify_product_id")
+  title            String
+  description      String?
+  handle           String   // URL handle
+  imageUrl         String?  @map("image_url")
+  price            Decimal  @db.Decimal(12, 2)
+  compareAtPrice   Decimal? @db.Decimal(12, 2) @map("compare_at_price")
+  currency         String   @default("USD")
+
+  variants    Json     @default("[]") // Array of variant data
+  tags        String[] @default([])
+  productType String?  @map("product_type")
+  vendor      String?
+
+  isAvailable Boolean  @default(true) @map("is_available")
+  syncedAt    DateTime @default(now()) @map("synced_at")
+
+  // Relations
+  store ShopifyStore @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@unique([storeId, shopifyProductId])
+  @@map("shopify_products")
+}
+
+model DiscountCode {
+  id                   String   @id @default(uuid())
+  storeId              String   @map("store_id")
+  campaignInfluencerId String?  @map("campaign_influencer_id")
+
+  code                 String   // INFLUENCER20
+  shopifyPriceRuleId   String?  @map("shopify_price_rule_id")
+  shopifyDiscountId    String?  @map("shopify_discount_id")
+
+  discountType  String  @map("discount_type") // PERCENTAGE, FIXED_AMOUNT
+  discountValue Decimal @db.Decimal(10, 2) @map("discount_value")
+
+  usageCount Int  @default(0) @map("usage_count")
+  maxUses    Int? @map("max_uses")
+
+  startsAt  DateTime? @map("starts_at")
+  expiresAt DateTime? @map("expires_at")
+
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  store              ShopifyStore        @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  campaignInfluencer CampaignInfluencer? @relation(fields: [campaignInfluencerId], references: [id])
+  attributedSales    AttributedSale[]
+
+  @@unique([storeId, code])
+  @@map("discount_codes")
+}
+
+model AttributedSale {
+  id             String   @id @default(uuid())
+  discountCodeId String   @map("discount_code_id")
+
+  shopifyOrderId String @map("shopify_order_id")
+  orderNumber    String @map("order_number")
+
+  subtotal       Decimal  @db.Decimal(12, 2)
+  discountAmount Decimal  @db.Decimal(12, 2) @map("discount_amount")
+  totalPrice     Decimal  @db.Decimal(12, 2) @map("total_price")
+  currency       String   @default("USD")
+
+  customerEmail  String?  @map("customer_email")
+
+  commission     Decimal? @db.Decimal(12, 2) // Calculated influencer commission
+  commissionRate Decimal? @db.Decimal(5, 2) @map("commission_rate") // Percentage
+
+  orderDate DateTime @map("order_date")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  discountCode DiscountCode @relation(fields: [discountCodeId], references: [id], onDelete: Cascade)
+
+  @@unique([discountCodeId, shopifyOrderId])
+  @@map("attributed_sales")
+}
+
+model SeedingCampaign {
+  id         String @id @default(uuid())
+  campaignId String @unique @map("campaign_id")
+
+  products             Json    @default("[]") // Array of {productId, variantId, quantity}
+  shippingInstructions String? @map("shipping_instructions")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  campaign  Campaign          @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  shipments SeedingShipment[]
+
+  @@map("seeding_campaigns")
+}
+
+model SeedingShipment {
+  id                   String @id @default(uuid())
+  seedingCampaignId    String @map("seeding_campaign_id")
+  campaignInfluencerId String @map("campaign_influencer_id")
+
+  status         ShipmentStatus @default(PENDING)
+  trackingNumber String?        @map("tracking_number")
+  carrier        String?        // USPS, FedEx, UPS, etc.
+
+  shippingAddress Json?    @map("shipping_address")
+  products        Json     @default("[]") // Products in this shipment
+
+  shippedAt   DateTime? @map("shipped_at")
+  deliveredAt DateTime? @map("delivered_at")
+
+  notes     String?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  seedingCampaign    SeedingCampaign    @relation(fields: [seedingCampaignId], references: [id], onDelete: Cascade)
+  campaignInfluencer CampaignInfluencer @relation(fields: [campaignInfluencerId], references: [id])
+
+  @@map("seeding_shipments")
+}
+
+enum ShipmentStatus {
+  PENDING
+  SHIPPED
+  DELIVERED
+  RETURNED
 }

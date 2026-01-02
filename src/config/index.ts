@@ -61,6 +61,15 @@ export const config = {
     callbackUrl: process.env.GOOGLE_CALLBACK_URL || 'http://localhost:4000/api/v1/auth/google/callback',
   },
 
+  // Shopify
+  shopify: {
+    apiKey: process.env.SHOPIFY_API_KEY || '',
+    apiSecret: process.env.SHOPIFY_API_SECRET || '',
+    scopes: 'read_products,write_products,read_orders,write_orders,read_price_rules,write_price_rules,read_discounts,write_discounts',
+    apiVersion: '2024-01',
+    webhookSecret: process.env.SHOPIFY_WEBHOOK_SECRET || '',
+  },
+
   // Frontend URL (for OAuth redirects)
   frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
 

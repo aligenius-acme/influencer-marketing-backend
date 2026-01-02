@@ -299,7 +299,7 @@ export const googleCallback = async (
 ) => {
   try {
     // Passport attaches the result from the Google strategy to req.user
-    const result = req.user as { user: any; tokens: { accessToken: string; refreshToken: string } };
+    const result = req.user as unknown as { user: any; tokens: { accessToken: string; refreshToken: string } };
 
     if (!result || !result.tokens) {
       return res.redirect(`${config.frontendUrl}/login?error=oauth_failed`);

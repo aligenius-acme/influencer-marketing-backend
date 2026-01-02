@@ -4,10 +4,10 @@ import { prisma } from '../config/postgres.js';
 import { BadRequestError, NotFoundError } from '../middlewares/errorHandler.js';
 
 // Initialize Stripe - only if secret key is configured
-const stripe = config.stripe.secretKey
-  ? new Stripe(config.stripe.secretKey, {
-      apiVersion: '2024-12-18.acacia',
-    })
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const StripeConstructor = Stripe as any;
+const stripe: Stripe | null = config.stripe.secretKey
+  ? (new StripeConstructor(config.stripe.secretKey) as Stripe)
   : null;
 
 if (!stripe) {
@@ -17,7 +17,7 @@ if (!stripe) {
 // Helper to ensure Stripe is configured
 function requireStripe(): Stripe {
   if (!stripe) {
-    throw new BadRequestError('Stripe is not configured. Please set STRIPE_SECRET_KEY in environment variables.');
+    throw BadRequestError('Stripe is not configured. Please set STRIPE_SECRET_KEY in environment variables.');
   }
   return stripe;
 }
@@ -401,6 +401,8 @@ class StripeService {
       trialing: 'TRIALING',
     };
 
+    // Use type assertion for Stripe SDK version compatibility
+    const sub = subscription as any;
     await prisma.subscription.upsert({
       where: { userId: actualUserId },
       create: {
@@ -409,16 +411,16 @@ class StripeService {
         stripePriceId: subscription.items.data[0]?.price.id || '',
         plan: plan,
         status: (statusMap[subscription.status] || 'ACTIVE') as any,
-        currentPeriodStart: new Date(subscription.current_period_start * 1000),
-        currentPeriodEnd: new Date(subscription.current_period_end * 1000),
+        currentPeriodStart: new Date((sub.current_period_start || 0) * 1000),
+        currentPeriodEnd: new Date((sub.current_period_end || 0) * 1000),
         cancelAtPeriodEnd: subscription.cancel_at_period_end,
       },
       update: {
         stripeSubscriptionId: subscription.id,
         stripePriceId: subscription.items.data[0]?.price.id || '',
         status: (statusMap[subscription.status] || 'ACTIVE') as any,
-        currentPeriodStart: new Date(subscription.current_period_start * 1000),
-        currentPeriodEnd: new Date(subscription.current_period_end * 1000),
+        currentPeriodStart: new Date((sub.current_period_start || 0) * 1000),
+        currentPeriodEnd: new Date((sub.current_period_end || 0) * 1000),
         cancelAtPeriodEnd: subscription.cancel_at_period_end,
       },
     });
@@ -447,10 +449,12 @@ class StripeService {
 
     if (!user) return;
 
+    // Use type assertion for Stripe SDK version compatibility
+    const inv = invoice as any;
     await prisma.payment.create({
       data: {
         userId: user.id,
-        stripePaymentId: invoice.payment_intent as string || invoice.id,
+        stripePaymentId: (inv.payment_intent as string) || invoice.id,
         amount: invoice.amount_paid / 100, // Convert cents to dollars
         currency: invoice.currency.toUpperCase(),
         status: 'SUCCEEDED',
@@ -459,7 +463,7 @@ class StripeService {
         receiptUrl: invoice.invoice_pdf,
         metadata: {
           invoiceId: invoice.id,
-          subscriptionId: invoice.subscription,
+          subscriptionId: inv.subscription || null,
         },
       },
     });
@@ -472,17 +476,19 @@ class StripeService {
 
     if (!user) return;
 
+    // Use type assertion for Stripe SDK version compatibility
+    const inv = invoice as any;
     await prisma.payment.create({
       data: {
         userId: user.id,
-        stripePaymentId: invoice.payment_intent as string || invoice.id,
+        stripePaymentId: (inv.payment_intent as string) || invoice.id,
         amount: invoice.amount_due / 100,
         currency: invoice.currency.toUpperCase(),
         status: 'FAILED',
         description: `Failed payment for subscription`,
         metadata: {
           invoiceId: invoice.id,
-          subscriptionId: invoice.subscription,
+          subscriptionId: inv.subscription || null,
         },
       },
     });

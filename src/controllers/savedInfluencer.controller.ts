@@ -1,16 +1,11 @@
 import { Request, Response, NextFunction } from 'express';
 import { savedInfluencerService } from '../services/savedInfluencer.service.js';
 
-// Extend Request type to include user
-interface AuthRequest extends Request {
-  user?: { userId: string; email: string; role: string };
-}
-
 // ==================== Saved Influencer Endpoints ====================
 
 // Save an influencer
 export const saveInfluencer = async (
-  req: AuthRequest,
+  req: Request,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
@@ -46,7 +41,7 @@ export const saveInfluencer = async (
 
 // Get all saved influencers with filters
 export const getSavedInfluencers = async (
-  req: AuthRequest,
+  req: Request,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
@@ -92,7 +87,7 @@ export const getSavedInfluencers = async (
 
 // Get a single saved influencer
 export const getSavedInfluencer = async (
-  req: AuthRequest,
+  req: Request,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
@@ -122,7 +117,7 @@ export const getSavedInfluencer = async (
 
 // Update a saved influencer
 export const updateSavedInfluencer = async (
-  req: AuthRequest,
+  req: Request,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
@@ -159,7 +154,7 @@ export const updateSavedInfluencer = async (
 
 // Remove a saved influencer
 export const removeSavedInfluencer = async (
-  req: AuthRequest,
+  req: Request,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
@@ -191,7 +186,7 @@ export const removeSavedInfluencer = async (
 
 // Get favorites
 export const getFavorites = async (
-  req: AuthRequest,
+  req: Request,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
@@ -220,7 +215,7 @@ export const getFavorites = async (
 
 // Toggle favorite
 export const toggleFavorite = async (
-  req: AuthRequest,
+  req: Request,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
@@ -250,7 +245,7 @@ export const toggleFavorite = async (
 
 // Check if influencer is saved
 export const checkIfSaved = async (
-  req: AuthRequest,
+  req: Request,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
@@ -279,7 +274,7 @@ export const checkIfSaved = async (
 
 // Bulk check if influencers are saved
 export const bulkCheckIfSaved = async (
-  req: AuthRequest,
+  req: Request,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
@@ -310,7 +305,7 @@ export const bulkCheckIfSaved = async (
 
 // Get stats
 export const getStats = async (
-  req: AuthRequest,
+  req: Request,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
@@ -336,7 +331,7 @@ export const getStats = async (
 
 // Create a list
 export const createList = async (
-  req: AuthRequest,
+  req: Request,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
@@ -374,7 +369,7 @@ export const createList = async (
 
 // Get all lists
 export const getLists = async (
-  req: AuthRequest,
+  req: Request,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
@@ -398,7 +393,7 @@ export const getLists = async (
 
 // Get a single list
 export const getList = async (
-  req: AuthRequest,
+  req: Request,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
@@ -428,7 +423,7 @@ export const getList = async (
 
 // Update a list
 export const updateList = async (
-  req: AuthRequest,
+  req: Request,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
@@ -471,7 +466,7 @@ export const updateList = async (
 
 // Delete a list
 export const deleteList = async (
-  req: AuthRequest,
+  req: Request,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
@@ -501,7 +496,7 @@ export const deleteList = async (
 
 // Add influencer to list
 export const addInfluencerToList = async (
-  req: AuthRequest,
+  req: Request,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
@@ -533,7 +528,7 @@ export const addInfluencerToList = async (
 
 // Remove influencer from list
 export const removeInfluencerFromList = async (
-  req: AuthRequest,
+  req: Request,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
@@ -563,7 +558,7 @@ export const removeInfluencerFromList = async (
 
 // Get influencers in a list
 export const getInfluencersInList = async (
-  req: AuthRequest,
+  req: Request,
   res: Response,
   next: NextFunction
 ): Promise<void> => {

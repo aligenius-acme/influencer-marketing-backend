@@ -316,7 +316,7 @@ class EmailTemplateService {
         subject: existing.subject,
         body: existing.body,
         templateType: existing.templateType,
-        variables: existing.variables,
+        variables: existing.variables ?? undefined,
       },
     });
 

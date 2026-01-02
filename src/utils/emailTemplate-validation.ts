@@ -27,7 +27,7 @@ export const createEmailTemplateSchema = z.object({
     .min(1, 'Body is required')
     .max(50000, 'Body must be less than 50000 characters'),
   templateType: z.enum(templateTypes, {
-    errorMap: () => ({ message: 'Invalid template type' }),
+    error: 'Invalid template type',
   }),
   variables: z.array(z.string()).optional(),
 });
@@ -50,7 +50,7 @@ export const updateEmailTemplateSchema = z.object({
     .max(50000, 'Body must be less than 50000 characters')
     .optional(),
   templateType: z.enum(templateTypes, {
-    errorMap: () => ({ message: 'Invalid template type' }),
+    error: 'Invalid template type',
   }).optional(),
   variables: z.array(z.string()).optional(),
 });
