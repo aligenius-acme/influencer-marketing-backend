@@ -9,6 +9,7 @@ import {
   forgotPassword,
   resetPassword,
   verifyEmail,
+  resendVerification,
 } from '../controllers/auth.controller.js';
 import { authenticate } from '../middlewares/auth.js';
 import { validate } from '../middlewares/validate.js';
@@ -84,5 +85,12 @@ router.post('/reset-password', validate(resetPasswordSchema), resetPassword);
  * @access  Public
  */
 router.post('/verify-email', verifyEmail);
+
+/**
+ * @route   POST /api/v1/auth/resend-verification
+ * @desc    Resend verification email
+ * @access  Private
+ */
+router.post('/resend-verification', authenticate, resendVerification);
 
 export default router;

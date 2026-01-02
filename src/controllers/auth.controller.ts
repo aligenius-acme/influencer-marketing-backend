@@ -245,10 +245,42 @@ export const verifyEmail = async (
   next: NextFunction
 ) => {
   try {
-    // TODO: Implement email verification
+    const { token } = req.body;
+
+    if (!token) {
+      return res.status(400).json({
+        success: false,
+        error: { message: 'Verification token is required' },
+      });
+    }
+
+    const result = await authService.verifyEmail(token);
+
     res.status(200).json({
       success: true,
-      message: 'Email verified successfully',
+      message: result.message,
+      data: { user: result.user },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Resend verification email
+ * POST /api/v1/auth/resend-verification
+ */
+export const resendVerification = async (
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const result = await authService.resendVerificationEmail(req.user!.userId);
+
+    res.status(200).json({
+      success: true,
+      message: result.message,
     });
   } catch (error) {
     next(error);

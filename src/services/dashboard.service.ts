@@ -233,8 +233,8 @@ class DashboardService {
 
     return activities.map((activity) => ({
       id: activity.id,
-      type: activity.type,
-      description: activity.description,
+      type: activity.activityType,
+      description: activity.description || '',
       campaignId: activity.campaign.id,
       campaignName: activity.campaign.name,
       createdAt: activity.createdAt,

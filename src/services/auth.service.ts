@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import { prisma } from '../config/postgres.js';
 import { config } from '../config/index.js';
+import { emailService } from './email.service.js';
 import {
   BadRequestError,
   UnauthorizedError,
@@ -96,6 +97,9 @@ class AuthService {
         brandProfile: true,
       },
     });
+
+    // Generate and send verification email
+    await this.sendVerificationEmail(user.id, user.email, companyName);
 
     // Generate tokens
     const tokens = await this.generateTokens({
@@ -255,20 +259,27 @@ class AuthService {
       return { message: 'If an account exists with this email, you will receive a password reset link' };
     }
 
+    // Delete any existing reset tokens for this user
+    await prisma.passwordResetToken.deleteMany({
+      where: { userId: user.id },
+    });
+
     // Generate reset token
     const resetToken = crypto.randomBytes(32).toString('hex');
     const resetTokenHash = this.hashToken(resetToken);
-    const resetTokenExpiry = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
 
-    // Store reset token (you'd need to add this field to the User model)
-    // For now, we'll just return the token (in production, send via email)
-    // await prisma.user.update({
-    //   where: { id: user.id },
-    //   data: { resetTokenHash, resetTokenExpiry },
-    // });
+    // Store reset token
+    await prisma.passwordResetToken.create({
+      data: {
+        userId: user.id,
+        tokenHash: resetTokenHash,
+        expiresAt,
+      },
+    });
 
-    // TODO: Send email with reset link
-    console.log(`Password reset token for ${email}: ${resetToken}`);
+    // Send password reset email
+    await emailService.sendPasswordResetEmail(email, resetToken);
 
     return { message: 'If an account exists with this email, you will receive a password reset link' };
   }
@@ -279,16 +290,138 @@ class AuthService {
   async resetPassword(token: string, newPassword: string): Promise<{ message: string }> {
     this.validatePassword(newPassword);
 
-    // TODO: Implement password reset with token validation
-    // const tokenHash = this.hashToken(token);
-    // const user = await prisma.user.findFirst({
-    //   where: {
-    //     resetTokenHash: tokenHash,
-    //     resetTokenExpiry: { gt: new Date() },
-    //   },
-    // });
+    const tokenHash = this.hashToken(token);
+
+    // Find the reset token
+    const resetToken = await prisma.passwordResetToken.findFirst({
+      where: {
+        tokenHash,
+        expiresAt: { gt: new Date() },
+      },
+      include: { user: true },
+    });
+
+    if (!resetToken) {
+      throw BadRequestError('Invalid or expired reset token');
+    }
+
+    // Hash new password
+    const passwordHash = await bcrypt.hash(newPassword, this.SALT_ROUNDS);
+
+    // Update password and delete the reset token
+    await prisma.$transaction([
+      prisma.user.update({
+        where: { id: resetToken.userId },
+        data: { passwordHash },
+      }),
+      prisma.passwordResetToken.deleteMany({
+        where: { userId: resetToken.userId },
+      }),
+    ]);
 
     return { message: 'Password has been reset successfully' };
+  }
+
+  /**
+   * Verify email with token
+   */
+  async verifyEmail(token: string): Promise<{ message: string; user: UserResponse }> {
+    // Find the verification token
+    const verificationToken = await prisma.emailVerificationToken.findUnique({
+      where: { token },
+      include: { user: { include: { brandProfile: true } } },
+    });
+
+    if (!verificationToken) {
+      throw BadRequestError('Invalid verification token');
+    }
+
+    if (verificationToken.expiresAt < new Date()) {
+      // Delete expired token
+      await prisma.emailVerificationToken.delete({
+        where: { id: verificationToken.id },
+      });
+      throw BadRequestError('Verification token has expired. Please request a new one.');
+    }
+
+    if (verificationToken.user.emailVerified) {
+      return {
+        message: 'Email is already verified',
+        user: this.formatUserResponse(verificationToken.user),
+      };
+    }
+
+    // Update user and delete the verification token
+    const user = await prisma.$transaction(async (tx) => {
+      await tx.emailVerificationToken.delete({
+        where: { id: verificationToken.id },
+      });
+
+      return tx.user.update({
+        where: { id: verificationToken.userId },
+        data: { emailVerified: true },
+        include: { brandProfile: true },
+      });
+    });
+
+    // Send welcome email
+    const companyName = user.brandProfile?.companyName || 'there';
+    await emailService.sendWelcomeEmail(user.email, companyName);
+
+    return {
+      message: 'Email verified successfully',
+      user: this.formatUserResponse(user),
+    };
+  }
+
+  /**
+   * Resend verification email
+   */
+  async resendVerificationEmail(userId: string): Promise<{ message: string }> {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      include: { brandProfile: true },
+    });
+
+    if (!user) {
+      throw NotFoundError('User not found');
+    }
+
+    if (user.emailVerified) {
+      return { message: 'Email is already verified' };
+    }
+
+    // Delete any existing verification tokens
+    await prisma.emailVerificationToken.deleteMany({
+      where: { userId },
+    });
+
+    // Send new verification email
+    const companyName = user.brandProfile?.companyName;
+    await this.sendVerificationEmail(userId, user.email, companyName);
+
+    return { message: 'Verification email sent successfully' };
+  }
+
+  /**
+   * Send verification email helper
+   */
+  private async sendVerificationEmail(userId: string, email: string, userName?: string): Promise<void> {
+    // Generate verification token
+    const token = crypto.randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
+    // Store verification token
+    await prisma.emailVerificationToken.create({
+      data: {
+        userId,
+        token,
+        expiresAt,
+      },
+    });
+
+    // Send email
+    await emailService.sendVerificationEmail(email, token, userName);
   }
 
   // ==================== Private Methods ====================

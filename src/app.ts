@@ -18,6 +18,7 @@ import campaignRoutes from './routes/campaign.routes.js';
 import listRoutes from './routes/list.routes.js';
 import analyticsRoutes from './routes/analytics.routes.js';
 import dashboardRoutes from './routes/dashboard.routes.js';
+import irmRoutes from './routes/irm.routes.js';
 
 const app: Express = express();
 
@@ -66,6 +67,7 @@ app.use(`${config.apiPrefix}/campaigns`, campaignRoutes);
 app.use(`${config.apiPrefix}/lists`, listRoutes);
 app.use(`${config.apiPrefix}/analytics`, analyticsRoutes);
 app.use(`${config.apiPrefix}/dashboard`, dashboardRoutes);
+app.use(`${config.apiPrefix}/irm`, irmRoutes);
 
 // Error handling
 app.use(notFoundHandler);
