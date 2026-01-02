@@ -20,6 +20,7 @@ import listRoutes from './routes/list.routes.js';
 import analyticsRoutes from './routes/analytics.routes.js';
 import dashboardRoutes from './routes/dashboard.routes.js';
 import irmRoutes from './routes/irm.routes.js';
+import emailTemplateRoutes from './routes/emailTemplate.routes.js';
 
 const app: Express = express();
 
@@ -72,6 +73,7 @@ app.use(`${config.apiPrefix}/lists`, listRoutes);
 app.use(`${config.apiPrefix}/analytics`, analyticsRoutes);
 app.use(`${config.apiPrefix}/dashboard`, dashboardRoutes);
 app.use(`${config.apiPrefix}/irm`, irmRoutes);
+app.use(`${config.apiPrefix}/email-templates`, emailTemplateRoutes);
 
 // Error handling
 app.use(notFoundHandler);
