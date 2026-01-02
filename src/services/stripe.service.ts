@@ -1,12 +1,26 @@
 import Stripe from 'stripe';
 import { config } from '../config/index.js';
-import { prisma } from '../lib/prisma.js';
+import { prisma } from '../config/postgres.js';
 import { BadRequestError, NotFoundError } from '../middlewares/errorHandler.js';
 
-// Initialize Stripe
-const stripe = new Stripe(config.stripe.secretKey, {
-  apiVersion: '2024-12-18.acacia',
-});
+// Initialize Stripe - only if secret key is configured
+const stripe = config.stripe.secretKey
+  ? new Stripe(config.stripe.secretKey, {
+      apiVersion: '2024-12-18.acacia',
+    })
+  : null;
+
+if (!stripe) {
+  console.log('Stripe not configured - payment features will be disabled');
+}
+
+// Helper to ensure Stripe is configured
+function requireStripe(): Stripe {
+  if (!stripe) {
+    throw new BadRequestError('Stripe is not configured. Please set STRIPE_SECRET_KEY in environment variables.');
+  }
+  return stripe;
+}
 
 // Plan details with features
 export const PLANS = {
@@ -109,7 +123,7 @@ class StripeService {
     }
 
     // Create new Stripe customer
-    const customer = await stripe.customers.create({
+    const customer = await requireStripe().customers.create({
       email: user.email,
       name: user.brandProfile?.companyName || user.email,
       metadata: {
@@ -146,7 +160,7 @@ class StripeService {
 
     const customerId = await this.getOrCreateCustomer(userId);
 
-    const session = await stripe.checkout.sessions.create({
+    const session = await requireStripe().checkout.sessions.create({
       customer: customerId,
       mode: 'subscription',
       payment_method_types: ['card'],
@@ -188,7 +202,7 @@ class StripeService {
       throw BadRequestError('No billing account found. Please subscribe first.');
     }
 
-    const session = await stripe.billingPortal.sessions.create({
+    const session = await requireStripe().billingPortal.sessions.create({
       customer: user.stripeCustomerId,
       return_url: returnUrl,
     });
@@ -244,7 +258,7 @@ class StripeService {
       throw BadRequestError('No active subscription found');
     }
 
-    await stripe.subscriptions.update(subscription.stripeSubscriptionId, {
+    await requireStripe().subscriptions.update(subscription.stripeSubscriptionId, {
       cancel_at_period_end: true,
     });
 
@@ -273,7 +287,7 @@ class StripeService {
       throw BadRequestError('Subscription is not set to cancel');
     }
 
-    await stripe.subscriptions.update(subscription.stripeSubscriptionId, {
+    await requireStripe().subscriptions.update(subscription.stripeSubscriptionId, {
       cancel_at_period_end: false,
     });
 
@@ -306,7 +320,7 @@ class StripeService {
     let event: Stripe.Event;
 
     try {
-      event = stripe.webhooks.constructEvent(
+      event = requireStripe().webhooks.constructEvent(
         payload,
         signature,
         config.stripe.webhookSecret
