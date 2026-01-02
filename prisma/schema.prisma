@@ -12,14 +12,16 @@ datasource db {
 // ==================== User Management ====================
 
 model User {
-  id            String    @id @default(uuid())
-  email         String    @unique
-  passwordHash  String?   @map("password_hash")
-  role          UserRole  @default(BRAND)
-  emailVerified Boolean   @default(false) @map("email_verified")
-  avatarUrl     String?   @map("avatar_url")
-  createdAt     DateTime  @default(now()) @map("created_at")
-  updatedAt     DateTime  @updatedAt @map("updated_at")
+  id            String       @id @default(uuid())
+  email         String       @unique
+  passwordHash  String?      @map("password_hash")
+  role          UserRole     @default(BRAND)
+  emailVerified Boolean      @default(false) @map("email_verified")
+  avatarUrl     String?      @map("avatar_url")
+  googleId      String?      @unique @map("google_id")
+  authProvider  AuthProvider @default(LOCAL) @map("auth_provider")
+  createdAt     DateTime     @default(now()) @map("created_at")
+  updatedAt     DateTime     @updatedAt @map("updated_at")
 
   // Relations
   brandProfile            BrandProfile?
@@ -36,6 +38,11 @@ model User {
 enum UserRole {
   BRAND
   ADMIN
+}
+
+enum AuthProvider {
+  LOCAL
+  GOOGLE
 }
 
 model BrandProfile {

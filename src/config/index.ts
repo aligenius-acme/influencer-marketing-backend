@@ -48,6 +48,16 @@ export const config = {
     webhookSecret: process.env.STRIPE_WEBHOOK_SECRET || '',
   },
 
+  // Google OAuth
+  google: {
+    clientId: process.env.GOOGLE_CLIENT_ID || '',
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
+    callbackUrl: process.env.GOOGLE_CALLBACK_URL || 'http://localhost:4000/api/v1/auth/google/callback',
+  },
+
+  // Frontend URL (for OAuth redirects)
+  frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
+
   // AWS S3
   aws: {
     accessKeyId: process.env.AWS_ACCESS_KEY_ID || '',

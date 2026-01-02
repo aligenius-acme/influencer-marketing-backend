@@ -19,6 +19,13 @@ interface RegisterInput {
   website?: string;
 }
 
+interface GoogleUserInput {
+  googleId: string;
+  email: string;
+  displayName: string;
+  avatarUrl?: string;
+}
+
 interface LoginInput {
   email: string;
   password: string;
@@ -404,6 +411,96 @@ class AuthService {
   }
 
   /**
+   * Find or create user via Google OAuth
+   */
+  async findOrCreateGoogleUser(input: GoogleUserInput): Promise<{ user: UserResponse; tokens: AuthTokens }> {
+    const { googleId, email, displayName, avatarUrl } = input;
+
+    // First, check if user exists by Google ID
+    let user = await prisma.user.findUnique({
+      where: { googleId },
+      include: { brandProfile: true },
+    });
+
+    if (user) {
+      // User found by Google ID - generate tokens and return
+      const tokens = await this.generateTokens({
+        userId: user.id,
+        email: user.email,
+        role: user.role,
+      });
+
+      return {
+        user: this.formatUserResponse(user),
+        tokens,
+      };
+    }
+
+    // Check if user exists by email (linking existing account)
+    user = await prisma.user.findUnique({
+      where: { email: email.toLowerCase() },
+      include: { brandProfile: true },
+    });
+
+    if (user) {
+      // Link Google account to existing user
+      user = await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          googleId,
+          authProvider: 'GOOGLE',
+          emailVerified: true, // Google emails are verified
+          ...(avatarUrl && !user.avatarUrl && { avatarUrl }),
+        },
+        include: { brandProfile: true },
+      });
+
+      const tokens = await this.generateTokens({
+        userId: user.id,
+        email: user.email,
+        role: user.role,
+      });
+
+      return {
+        user: this.formatUserResponse(user),
+        tokens,
+      };
+    }
+
+    // Create new user with Google account
+    user = await prisma.user.create({
+      data: {
+        email: email.toLowerCase(),
+        googleId,
+        authProvider: 'GOOGLE',
+        emailVerified: true, // Google emails are verified
+        avatarUrl,
+        role: 'BRAND',
+        brandProfile: {
+          create: {
+            companyName: displayName || 'My Company',
+          },
+        },
+      },
+      include: { brandProfile: true },
+    });
+
+    // Send welcome email for new users
+    await emailService.sendWelcomeEmail(email, displayName || 'there');
+
+    const tokens = await this.generateTokens({
+      userId: user.id,
+      email: user.email,
+      role: user.role,
+    });
+
+    return {
+      user: this.formatUserResponse(user),
+      tokens,
+    };
+  }
+
+  /**
    * Send verification email helper
    */
   private async sendVerificationEmail(userId: string, email: string, userName?: string): Promise<void> {
@@ -509,3 +606,4 @@ class AuthService {
 }
 
 export const authService = new AuthService();
+export { AuthService };

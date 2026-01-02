@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { authService } from '../services/auth.service.js';
+import { config } from '../config/index.js';
 import { AuthenticatedRequest } from '../middlewares/auth.js';
 import {
   RegisterInput,
@@ -284,5 +285,39 @@ export const resendVerification = async (
     });
   } catch (error) {
     next(error);
+  }
+};
+
+/**
+ * Google OAuth callback
+ * GET /api/v1/auth/google/callback
+ */
+export const googleCallback = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    // Passport attaches the result from the Google strategy to req.user
+    const result = req.user as { user: any; tokens: { accessToken: string; refreshToken: string } };
+
+    if (!result || !result.tokens) {
+      return res.redirect(`${config.frontendUrl}/login?error=oauth_failed`);
+    }
+
+    // Set refresh token as HTTP-only cookie
+    res.cookie('refreshToken', result.tokens.refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      path: '/',
+    });
+
+    // Redirect to frontend with access token
+    res.redirect(`${config.frontendUrl}/oauth-callback?token=${result.tokens.accessToken}`);
+  } catch (error) {
+    console.error('Google OAuth callback error:', error);
+    res.redirect(`${config.frontendUrl}/login?error=oauth_failed`);
   }
 };

@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import passport from 'passport';
 import {
   register,
   login,
@@ -10,6 +11,7 @@ import {
   resetPassword,
   verifyEmail,
   resendVerification,
+  googleCallback,
 } from '../controllers/auth.controller.js';
 import { authenticate } from '../middlewares/auth.js';
 import { validate } from '../middlewares/validate.js';
@@ -92,5 +94,26 @@ router.post('/verify-email', verifyEmail);
  * @access  Private
  */
 router.post('/resend-verification', authenticate, resendVerification);
+
+/**
+ * @route   GET /api/v1/auth/google
+ * @desc    Initiate Google OAuth login
+ * @access  Public
+ */
+router.get(
+  '/google',
+  passport.authenticate('google', { scope: ['email', 'profile'], session: false })
+);
+
+/**
+ * @route   GET /api/v1/auth/google/callback
+ * @desc    Google OAuth callback
+ * @access  Public
+ */
+router.get(
+  '/google/callback',
+  passport.authenticate('google', { session: false, failureRedirect: '/login?error=oauth_failed' }),
+  googleCallback
+);
 
 export default router;
