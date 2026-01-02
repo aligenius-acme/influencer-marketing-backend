@@ -22,6 +22,7 @@ import dashboardRoutes from './routes/dashboard.routes.js';
 import irmRoutes from './routes/irm.routes.js';
 import emailTemplateRoutes from './routes/emailTemplate.routes.js';
 import csvImportExportRoutes from './routes/csvImportExport.routes.js';
+import paymentRoutes from './routes/payment.routes.js';
 
 const app: Express = express();
 
@@ -39,6 +40,9 @@ const limiter = rateLimit({
   message: { error: 'Too many requests, please try again later.' },
 });
 app.use(limiter);
+
+// Stripe webhook needs raw body - must be before JSON parser
+app.use(`${config.apiPrefix}/payments/webhook`, express.raw({ type: 'application/json' }));
 
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
@@ -76,6 +80,7 @@ app.use(`${config.apiPrefix}/dashboard`, dashboardRoutes);
 app.use(`${config.apiPrefix}/irm`, irmRoutes);
 app.use(`${config.apiPrefix}/email-templates`, emailTemplateRoutes);
 app.use(`${config.apiPrefix}/csv`, csvImportExportRoutes);
+app.use(`${config.apiPrefix}/payments`, paymentRoutes);
 
 // Error handling
 app.use(notFoundHandler);

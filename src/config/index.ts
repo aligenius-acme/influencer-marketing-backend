@@ -46,6 +46,12 @@ export const config = {
   stripe: {
     secretKey: process.env.STRIPE_SECRET_KEY || '',
     webhookSecret: process.env.STRIPE_WEBHOOK_SECRET || '',
+    // Pricing plans (prices created in Stripe Dashboard)
+    prices: {
+      starter: process.env.STRIPE_PRICE_STARTER || '',
+      professional: process.env.STRIPE_PRICE_PROFESSIONAL || '',
+      enterprise: process.env.STRIPE_PRICE_ENTERPRISE || '',
+    },
   },
 
   // Google OAuth
