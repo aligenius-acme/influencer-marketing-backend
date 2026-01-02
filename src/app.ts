@@ -24,6 +24,7 @@ import emailTemplateRoutes from './routes/emailTemplate.routes.js';
 import csvImportExportRoutes from './routes/csvImportExport.routes.js';
 import paymentRoutes from './routes/payment.routes.js';
 import messagingRoutes from './routes/messaging.routes.js';
+import contentApprovalRoutes from './routes/contentApproval.routes.js';
 
 const app: Express = express();
 
@@ -83,6 +84,7 @@ app.use(`${config.apiPrefix}/email-templates`, emailTemplateRoutes);
 app.use(`${config.apiPrefix}/csv`, csvImportExportRoutes);
 app.use(`${config.apiPrefix}/payments`, paymentRoutes);
 app.use(`${config.apiPrefix}/messaging`, messagingRoutes);
+app.use(`${config.apiPrefix}/content`, contentApprovalRoutes);
 
 // Error handling
 app.use(notFoundHandler);
