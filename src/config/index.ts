@@ -70,6 +70,54 @@ export const config = {
     webhookSecret: process.env.SHOPIFY_WEBHOOK_SECRET || '',
   },
 
+  // ==================== Phase 3: Social Media APIs ====================
+
+  // Instagram Graph API
+  instagram: {
+    clientId: process.env.INSTAGRAM_CLIENT_ID || '',
+    clientSecret: process.env.INSTAGRAM_CLIENT_SECRET || '',
+    callbackUrl: process.env.INSTAGRAM_CALLBACK_URL || 'http://localhost:4000/api/v1/social/callback/instagram',
+  },
+
+  // TikTok API
+  tiktok: {
+    clientKey: process.env.TIKTOK_CLIENT_KEY || '',
+    clientSecret: process.env.TIKTOK_CLIENT_SECRET || '',
+    callbackUrl: process.env.TIKTOK_CALLBACK_URL || 'http://localhost:4000/api/v1/social/callback/tiktok',
+  },
+
+  // YouTube Data API
+  youtube: {
+    clientId: process.env.YOUTUBE_CLIENT_ID || '',
+    clientSecret: process.env.YOUTUBE_CLIENT_SECRET || '',
+    callbackUrl: process.env.YOUTUBE_CALLBACK_URL || 'http://localhost:4000/api/v1/social/callback/youtube',
+  },
+
+  // ==================== Phase 3: E-Signature ====================
+
+  // DocuSign
+  docusign: {
+    integrationKey: process.env.DOCUSIGN_INTEGRATION_KEY || '',
+    secretKey: process.env.DOCUSIGN_SECRET_KEY || '',
+    accountId: process.env.DOCUSIGN_ACCOUNT_ID || '',
+    baseUrl: process.env.DOCUSIGN_BASE_URL || 'https://demo.docusign.net/restapi',
+    oauthUrl: process.env.DOCUSIGN_OAUTH_URL || 'https://account-d.docusign.com',
+  },
+
+  // ==================== Phase 3: AI Services ====================
+
+  // OpenAI (for sentiment analysis, content suggestions)
+  openai: {
+    apiKey: process.env.OPENAI_API_KEY || '',
+  },
+
+  // ==================== Phase 3: Background Jobs ====================
+
+  // BullMQ (uses Redis connection)
+  bullmq: {
+    redisUrl: process.env.BULL_REDIS_URL || process.env.REDIS_URL || 'redis://localhost:6379',
+  },
+
   // Frontend URL (for OAuth redirects)
   frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
 

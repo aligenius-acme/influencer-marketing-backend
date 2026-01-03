@@ -26,6 +26,18 @@ import paymentRoutes from './routes/payment.routes.js';
 import messagingRoutes from './routes/messaging.routes.js';
 import contentApprovalRoutes from './routes/contentApproval.routes.js';
 import shopifyRoutes from './routes/shopify.routes.js';
+import socialMediaRoutes from './routes/socialMedia.routes.js';
+import postTrackingRoutes from './routes/postTracking.routes.js';
+import aiRoutes from './routes/ai.routes.js';
+import socialListeningRoutes from './routes/socialListening.routes.js';
+import contractRoutes from './routes/contract.routes.js';
+
+// Phase 4: Enterprise Features
+import workspaceRoutes from './routes/workspace.routes.js';
+import apiKeyRoutes from './routes/apiKey.routes.js';
+import webhookRoutes from './routes/webhook.routes.js';
+import tenantRoutes from './routes/tenant.routes.js';
+import auditRoutes from './routes/audit.routes.js';
 
 const app: Express = express();
 
@@ -90,6 +102,18 @@ app.use(`${config.apiPrefix}/payments`, paymentRoutes);
 app.use(`${config.apiPrefix}/messaging`, messagingRoutes);
 app.use(`${config.apiPrefix}/content`, contentApprovalRoutes);
 app.use(`${config.apiPrefix}/shopify`, shopifyRoutes);
+app.use(`${config.apiPrefix}/social`, socialMediaRoutes);
+app.use(`${config.apiPrefix}/posts`, postTrackingRoutes);
+app.use(`${config.apiPrefix}/ai`, aiRoutes);
+app.use(`${config.apiPrefix}/listening`, socialListeningRoutes);
+app.use(`${config.apiPrefix}/contracts`, contractRoutes);
+
+// Phase 4: Enterprise routes
+app.use(`${config.apiPrefix}/workspaces`, workspaceRoutes);
+app.use(`${config.apiPrefix}/api-keys`, apiKeyRoutes);
+app.use(`${config.apiPrefix}/webhooks`, webhookRoutes);
+app.use(`${config.apiPrefix}/tenant`, tenantRoutes);
+app.use(`${config.apiPrefix}/audit`, auditRoutes);
 
 // Error handling
 app.use(notFoundHandler);
