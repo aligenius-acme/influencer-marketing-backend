@@ -1,8 +1,10 @@
+import { createServer } from 'http';
 import app from './app.js';
 import { config } from './config/index.js';
 import { connectMongoDB } from './config/mongodb.js';
 import { connectPostgres } from './config/postgres.js';
 import { connectRedis } from './config/redis.js';
+import { initializeSocket } from './config/socket.js';
 
 const startServer = async () => {
   try {
@@ -18,8 +20,14 @@ const startServer = async () => {
     await connectRedis();
     console.log('Redis connected');
 
+    // Create HTTP server for Socket.IO
+    const httpServer = createServer(app);
+
+    // Initialize Socket.IO
+    initializeSocket(httpServer);
+
     // Start server
-    app.listen(config.port, () => {
+    httpServer.listen(config.port, () => {
       console.log(`
 ╔═══════════════════════════════════════════════════════════╗
 ║                                                           ║
@@ -28,6 +36,7 @@ const startServer = async () => {
 ║   Environment: ${config.env.padEnd(40)}║
 ║   Port: ${config.port.toString().padEnd(47)}║
 ║   API: http://localhost:${config.port}${config.apiPrefix.padEnd(28)}║
+║   WebSocket: ws://localhost:${config.port.toString().padEnd(26)}║
 ║                                                           ║
 ╚═══════════════════════════════════════════════════════════╝
       `);

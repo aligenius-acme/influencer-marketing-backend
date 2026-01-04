@@ -121,6 +121,9 @@ export const config = {
   // Frontend URL (for OAuth redirects)
   frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
 
+  // API URL (for OAuth callbacks)
+  apiUrl: process.env.API_URL || 'http://localhost:4000/api/v1',
+
   // AWS S3
   aws: {
     accessKeyId: process.env.AWS_ACCESS_KEY_ID || '',
@@ -131,7 +134,9 @@ export const config = {
 
   // CORS
   cors: {
-    origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
+    origin: process.env.CORS_ORIGIN
+      ? process.env.CORS_ORIGIN.split(',').map(s => s.trim())
+      : ['http://localhost:3000', 'http://localhost:3002'],
   },
 
   // Rate Limiting

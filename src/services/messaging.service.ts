@@ -2,6 +2,7 @@ import { Conversation, IConversation, IMessage } from '../models/Conversation.js
 import { SavedInfluencer } from '../models/SavedInfluencer.js';
 import { BadRequestError, NotFoundError } from '../middlewares/errorHandler.js';
 import mongoose from 'mongoose';
+import { emitToUser, emitToConversation } from '../config/socket.js';
 
 interface CreateConversationInput {
   influencerId: string;
@@ -261,6 +262,18 @@ class MessagingService {
 
     await conversation.save();
 
+    // Emit real-time event
+    const messageData = {
+      conversationId,
+      message: message as IMessage,
+      lastMessage: conversation.lastMessage,
+    };
+    emitToConversation(conversationId, 'message:new', messageData);
+    emitToUser(userId, 'conversation:updated', {
+      conversationId,
+      lastMessage: conversation.lastMessage,
+    });
+
     return message as IMessage;
   }
 
@@ -301,6 +314,21 @@ class MessagingService {
 
     await conversation.save();
 
+    // Emit real-time event for incoming message
+    const messageData = {
+      conversationId,
+      message: message as IMessage,
+      lastMessage: conversation.lastMessage,
+      unreadCount: conversation.unreadCount,
+    };
+    emitToConversation(conversationId, 'message:new', messageData);
+    emitToUser(userId, 'message:incoming', messageData);
+    emitToUser(userId, 'conversation:updated', {
+      conversationId,
+      lastMessage: conversation.lastMessage,
+      unreadCount: conversation.unreadCount,
+    });
+
     return message as IMessage;
   }
 
@@ -331,6 +359,13 @@ class MessagingService {
     if (updated) {
       conversation.unreadCount = 0;
       await conversation.save();
+
+      // Emit read receipt
+      emitToConversation(conversationId, 'messages:read', {
+        conversationId,
+        readBy: userId,
+        readAt: now.toISOString(),
+      });
     }
   }
 

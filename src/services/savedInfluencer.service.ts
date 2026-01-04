@@ -13,6 +13,7 @@ export interface SaveInfluencerInput {
   tags?: string[];
   isFavorite?: boolean;
   listIds?: string[];
+  customFields?: Record<string, string | number | boolean>;
 }
 
 export interface UpdateInfluencerInput {
@@ -51,7 +52,7 @@ class SavedInfluencerService {
   // ==================== Saved Influencer Methods ====================
 
   async saveInfluencer(input: SaveInfluencerInput): Promise<ISavedInfluencer> {
-    const { userId, scrapcreatorsId, platform, profile, audience, notes, tags, isFavorite, listIds } = input;
+    const { userId, scrapcreatorsId, platform, profile, audience, notes, tags, isFavorite, listIds, customFields } = input;
 
     // Check if already saved
     const existing = await SavedInfluencer.findOne({
@@ -85,6 +86,7 @@ class SavedInfluencerService {
       audience,
       notes: notes || '',
       tags: tags || [],
+      customFields: customFields || {},
       isFavorite: isFavorite ?? true,
       lists: listIds?.map(id => new Types.ObjectId(id)) || [],
       lastSynced: new Date(),

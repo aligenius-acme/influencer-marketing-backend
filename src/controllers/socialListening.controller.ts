@@ -28,7 +28,7 @@ export const createRule = async (
       return;
     }
 
-    const { name, description, keywords, hashtags, mentions, excludeKeywords, platforms, minFollowers, maxFollowers, verifiedOnly, scanFrequency } = req.body;
+    const { name, description, keywords, hashtags, mentions, excludeKeywords, platforms, minFollowers, maxFollowers, verifiedOnly, scanFrequency, notifications } = req.body;
 
     if (!name || !keywords || !platforms) {
       res.status(400).json({ error: 'Name, keywords, and platforms are required' });
@@ -47,6 +47,7 @@ export const createRule = async (
       maxFollowers,
       verifiedOnly,
       scanFrequency,
+      notifications,
     });
 
     res.status(201).json({
@@ -210,6 +211,48 @@ export const toggleRule = async (
     const { id } = req.params;
 
     const rule = await socialListeningService.toggleRulePause(userId, id);
+
+    if (!rule) {
+      res.status(404).json({ error: 'Rule not found' });
+      return;
+    }
+
+    res.json({
+      success: true,
+      data: rule,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Update rule notification settings
+ * PATCH /api/v1/listening/rules/:id/notifications
+ */
+export const updateRuleNotifications = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+
+    const { id } = req.params;
+    const { emailEnabled, inAppEnabled, slackEnabled, slackWebhookUrl, minimumRelevanceScore, sentimentFilter } = req.body;
+
+    const rule = await socialListeningService.updateRuleNotifications(userId, id, {
+      emailEnabled,
+      inAppEnabled,
+      slackEnabled,
+      slackWebhookUrl,
+      minimumRelevanceScore,
+      sentimentFilter,
+    });
 
     if (!rule) {
       res.status(404).json({ error: 'Rule not found' });

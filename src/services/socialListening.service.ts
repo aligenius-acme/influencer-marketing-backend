@@ -10,10 +10,12 @@
 
 import { config } from '../config/index.js';
 import { BrandMention, IBrandMention } from '../models/BrandMention.js';
-import { MonitoringRule, IMonitoringRule } from '../models/MonitoringRule.js';
+import { MonitoringRule, IMonitoringRule, INotificationSettings } from '../models/MonitoringRule.js';
 import { TrendReport, ITrendReport, ISentimentBreakdown } from '../models/TrendReport.js';
 import { Types } from 'mongoose';
 import { queueService } from './jobs/queue.service.js';
+import { emailService } from './email.service.js';
+import { prisma } from '../config/postgres.js';
 
 // ==================== Types ====================
 
@@ -29,6 +31,7 @@ export interface CreateRuleInput {
   maxFollowers?: number;
   verifiedOnly?: boolean;
   scanFrequency?: 'realtime' | 'hourly' | 'daily';
+  notifications?: Partial<INotificationSettings>;
 }
 
 export interface MentionFilters {
@@ -84,6 +87,14 @@ class SocialListeningService {
       scanFrequency: input.scanFrequency || 'hourly',
       isActive: true,
       isPaused: false,
+      notifications: input.notifications ? {
+        emailEnabled: input.notifications.emailEnabled ?? true,
+        inAppEnabled: input.notifications.inAppEnabled ?? true,
+        slackEnabled: input.notifications.slackEnabled ?? false,
+        slackWebhookUrl: input.notifications.slackWebhookUrl,
+        minimumRelevanceScore: input.notifications.minimumRelevanceScore ?? 50,
+        sentimentFilter: input.notifications.sentimentFilter ?? ['positive', 'neutral', 'negative'],
+      } : undefined,
     });
 
     await rule.save();
@@ -539,12 +550,123 @@ class SocialListeningService {
     await mention.save();
 
     // Update rule stats
-    await MonitoringRule.findByIdAndUpdate(ruleId, {
+    const rule = await MonitoringRule.findByIdAndUpdate(ruleId, {
       $inc: { totalMentions: 1 },
       $set: { lastMentionAt: mention.mentionedAt },
-    });
+    }, { new: true });
+
+    // Send email alert if enabled
+    if (rule) {
+      await this.sendMentionAlert(userId, rule, mention);
+    }
 
     return mention;
+  }
+
+  // ==================== Email Alerts ====================
+
+  /**
+   * Send email alert for a brand mention
+   */
+  private async sendMentionAlert(
+    userId: string,
+    rule: IMonitoringRule,
+    mention: IBrandMention
+  ): Promise<void> {
+    try {
+      // Check if email notifications are enabled
+      if (!rule.notifications?.emailEnabled) {
+        console.log(`[SocialListening] Email alerts disabled for rule: ${rule.name}`);
+        return;
+      }
+
+      // Check minimum relevance score
+      if (mention.relevanceScore < (rule.notifications.minimumRelevanceScore || 50)) {
+        console.log(`[SocialListening] Mention relevance ${mention.relevanceScore} below threshold ${rule.notifications.minimumRelevanceScore}`);
+        return;
+      }
+
+      // Check sentiment filter
+      const sentimentFilter = rule.notifications.sentimentFilter || ['positive', 'neutral', 'negative'];
+      if (!sentimentFilter.includes(mention.sentiment)) {
+        console.log(`[SocialListening] Mention sentiment ${mention.sentiment} not in filter: ${sentimentFilter.join(', ')}`);
+        return;
+      }
+
+      // Get user email from database
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { email: true },
+      });
+
+      if (!user?.email) {
+        console.log(`[SocialListening] No email found for user: ${userId}`);
+        return;
+      }
+
+      // Send the alert email
+      console.log(`[SocialListening] Sending mention alert to ${user.email} for rule: ${rule.name}`);
+
+      await emailService.sendBrandMentionAlert(user.email, {
+        ruleName: rule.name,
+        platform: mention.platform,
+        content: mention.content,
+        contentPreview: mention.contentPreview,
+        authorUsername: mention.authorUsername,
+        authorFollowers: mention.authorFollowers,
+        isVerified: mention.isVerified,
+        sentiment: mention.sentiment,
+        relevanceScore: mention.relevanceScore / 100, // Convert to 0-1 scale for template
+        sourceUrl: mention.sourceUrl,
+        matchedKeywords: mention.matchedKeywords,
+        matchedHashtags: mention.matchedHashtags,
+        detectedAt: mention.mentionedAt,
+        likes: mention.likes,
+        comments: mention.comments,
+        shares: mention.shares,
+      });
+
+      console.log(`[SocialListening] Alert email sent successfully`);
+    } catch (error) {
+      console.error('[SocialListening] Failed to send mention alert:', error);
+      // Don't throw - email failure shouldn't break mention creation
+    }
+  }
+
+  /**
+   * Update notification settings for a rule
+   */
+  async updateRuleNotifications(
+    userId: string,
+    ruleId: string,
+    notifications: Partial<INotificationSettings>
+  ): Promise<IMonitoringRule | null> {
+    const updateFields: Record<string, unknown> = {};
+
+    if (notifications.emailEnabled !== undefined) {
+      updateFields['notifications.emailEnabled'] = notifications.emailEnabled;
+    }
+    if (notifications.inAppEnabled !== undefined) {
+      updateFields['notifications.inAppEnabled'] = notifications.inAppEnabled;
+    }
+    if (notifications.slackEnabled !== undefined) {
+      updateFields['notifications.slackEnabled'] = notifications.slackEnabled;
+    }
+    if (notifications.slackWebhookUrl !== undefined) {
+      updateFields['notifications.slackWebhookUrl'] = notifications.slackWebhookUrl;
+    }
+    if (notifications.minimumRelevanceScore !== undefined) {
+      updateFields['notifications.minimumRelevanceScore'] = notifications.minimumRelevanceScore;
+    }
+    if (notifications.sentimentFilter !== undefined) {
+      updateFields['notifications.sentimentFilter'] = notifications.sentimentFilter;
+    }
+
+    return MonitoringRule.findOneAndUpdate(
+      { _id: new Types.ObjectId(ruleId), userId },
+      { $set: updateFields },
+      { new: true }
+    );
   }
 }
 

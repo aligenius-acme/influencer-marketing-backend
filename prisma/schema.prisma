@@ -23,6 +23,11 @@ model User {
   createdAt     DateTime     @default(now()) @map("created_at")
   updatedAt     DateTime     @updatedAt @map("updated_at")
 
+  // Two-Factor Authentication
+  twoFactorEnabled Boolean   @default(false) @map("two_factor_enabled")
+  twoFactorSecret  String?   @map("two_factor_secret")
+  backupCodes      String[]  @default([]) @map("backup_codes")
+
   // Stripe fields
   stripeCustomerId String? @unique @map("stripe_customer_id")
 
@@ -283,6 +288,160 @@ enum PaymentStatus {
   SUCCEEDED
   FAILED
   REFUNDED
+}
+
+// ==================== Stripe Connect & Payouts ====================
+
+model ConnectedAccount {
+  id                    String                @id @default(uuid())
+  savedInfluencerId     String                @unique @map("saved_influencer_id")
+
+  stripeAccountId       String                @unique @map("stripe_account_id")
+  email                 String
+  country               String                @default("US")
+
+  // Account status
+  status                ConnectAccountStatus  @default(PENDING)
+  chargesEnabled        Boolean               @default(false) @map("charges_enabled")
+  payoutsEnabled        Boolean               @default(false) @map("payouts_enabled")
+  detailsSubmitted      Boolean               @default(false) @map("details_submitted")
+
+  // Verification
+  requirementsDue       Json                  @default("[]") @map("requirements_due")
+  requirementsDisabled  String?               @map("requirements_disabled")
+
+  // Payout settings
+  defaultCurrency       String                @default("USD") @map("default_currency")
+  payoutSchedule        Json                  @default("{}") @map("payout_schedule")
+
+  // Bank account info (masked)
+  bankLast4             String?               @map("bank_last4")
+  bankName              String?               @map("bank_name")
+
+  onboardingCompletedAt DateTime?             @map("onboarding_completed_at")
+  createdAt             DateTime              @default(now()) @map("created_at")
+  updatedAt             DateTime              @updatedAt @map("updated_at")
+
+  // Relations
+  payouts               Payout[]
+
+  @@map("connected_accounts")
+}
+
+enum ConnectAccountStatus {
+  PENDING
+  ONBOARDING
+  ACTIVE
+  RESTRICTED
+  DISABLED
+}
+
+model Payout {
+  id                    String        @id @default(uuid())
+  connectedAccountId    String        @map("connected_account_id")
+  userId                String        @map("user_id") // Brand who initiated payout
+  campaignId            String?       @map("campaign_id")
+  campaignInfluencerId  String?       @map("campaign_influencer_id")
+  invoiceId             String?       @map("invoice_id")
+
+  stripeTransferId      String?       @unique @map("stripe_transfer_id")
+  stripePayoutId        String?       @map("stripe_payout_id")
+
+  amount                Decimal       @db.Decimal(12, 2)
+  currency              String        @default("USD")
+  fee                   Decimal       @default(0) @db.Decimal(10, 2)
+  netAmount             Decimal       @db.Decimal(12, 2) @map("net_amount")
+
+  status                PayoutStatus  @default(PENDING)
+
+  description           String?
+  metadata              Json          @default("{}")
+
+  // Dates
+  initiatedAt           DateTime      @default(now()) @map("initiated_at")
+  processedAt           DateTime?     @map("processed_at")
+  arrivedAt             DateTime?     @map("arrived_at")
+  failedAt              DateTime?     @map("failed_at")
+  failureReason         String?       @map("failure_reason")
+
+  createdAt             DateTime      @default(now()) @map("created_at")
+  updatedAt             DateTime      @updatedAt @map("updated_at")
+
+  // Relations
+  connectedAccount      ConnectedAccount @relation(fields: [connectedAccountId], references: [id], onDelete: Cascade)
+  invoice               Invoice?      @relation(fields: [invoiceId], references: [id])
+
+  @@index([connectedAccountId, status])
+  @@index([userId, createdAt])
+  @@map("payouts")
+}
+
+enum PayoutStatus {
+  PENDING
+  PROCESSING
+  IN_TRANSIT
+  PAID
+  FAILED
+  CANCELLED
+}
+
+model Invoice {
+  id                    String        @id @default(uuid())
+  userId                String        @map("user_id")
+  savedInfluencerId     String        @map("saved_influencer_id")
+  campaignId            String?       @map("campaign_id")
+  campaignInfluencerId  String?       @map("campaign_influencer_id")
+  contractId            String?       @map("contract_id")
+
+  invoiceNumber         String        @unique @map("invoice_number")
+
+  // Amounts
+  subtotal              Decimal       @db.Decimal(12, 2)
+  taxAmount             Decimal       @default(0) @db.Decimal(10, 2) @map("tax_amount")
+  taxRate               Decimal       @default(0) @db.Decimal(5, 2) @map("tax_rate")
+  discountAmount        Decimal       @default(0) @db.Decimal(10, 2) @map("discount_amount")
+  total                 Decimal       @db.Decimal(12, 2)
+  currency              String        @default("USD")
+
+  status                InvoiceStatus @default(DRAFT)
+
+  // Line items
+  lineItems             Json          @default("[]") @map("line_items")
+
+  // Notes and terms
+  notes                 String?
+  paymentTerms          String?       @map("payment_terms")
+
+  // Dates
+  issueDate             DateTime      @default(now()) @map("issue_date")
+  dueDate               DateTime      @map("due_date")
+  paidAt                DateTime?     @map("paid_at")
+  voidedAt              DateTime?     @map("voided_at")
+
+  // Stripe
+  stripeInvoiceId       String?       @unique @map("stripe_invoice_id")
+  stripeInvoiceUrl      String?       @map("stripe_invoice_url")
+  stripePdfUrl          String?       @map("stripe_pdf_url")
+
+  createdAt             DateTime      @default(now()) @map("created_at")
+  updatedAt             DateTime      @updatedAt @map("updated_at")
+
+  // Relations
+  payouts               Payout[]
+
+  @@index([userId, status])
+  @@index([savedInfluencerId])
+  @@map("invoices")
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  VIEWED
+  PAID
+  OVERDUE
+  VOIDED
+  CANCELLED
 }
 
 // ==================== Shopify E-commerce Integration ====================
@@ -939,4 +1098,120 @@ model IpAllowlist {
 
   @@unique([workspaceId, ipAddress])
   @@map("ip_allowlists")
+}
+
+// ==================== Phase 4: Workflow Automation ====================
+
+model WorkflowRule {
+  id          String         @id @default(uuid())
+  userId      String         @map("user_id")
+  workspaceId String?        @map("workspace_id")
+
+  name        String
+  description String?
+
+  // Trigger configuration
+  triggerType WorkflowTrigger @map("trigger_type")
+  triggerConfig Json          @default("{}") @map("trigger_config")
+
+  // Conditions (optional filtering)
+  conditions  Json            @default("[]") // Array of condition objects
+
+  // Actions to perform
+  actions     Json            @default("[]") // Array of action objects
+
+  // Timing
+  delay       Int?            // Delay in minutes before executing
+  schedule    String?         // Cron expression for scheduled workflows
+
+  // Status
+  isActive    Boolean         @default(true) @map("is_active")
+  priority    Int             @default(0) // Higher priority runs first
+
+  // Stats
+  executionCount Int          @default(0) @map("execution_count")
+  lastExecutedAt DateTime?    @map("last_executed_at")
+
+  createdAt   DateTime        @default(now()) @map("created_at")
+  updatedAt   DateTime        @updatedAt @map("updated_at")
+
+  // Relations
+  executions  WorkflowExecution[]
+
+  @@index([userId, isActive])
+  @@index([triggerType, isActive])
+  @@map("workflow_rules")
+}
+
+enum WorkflowTrigger {
+  // Campaign triggers
+  CAMPAIGN_CREATED
+  CAMPAIGN_STATUS_CHANGED
+  CAMPAIGN_STARTED
+  CAMPAIGN_ENDED
+
+  // Influencer triggers
+  INFLUENCER_ADDED_TO_CAMPAIGN
+  INFLUENCER_STATUS_CHANGED
+  INFLUENCER_REMOVED_FROM_CAMPAIGN
+
+  // Contract triggers
+  CONTRACT_CREATED
+  CONTRACT_SENT
+  CONTRACT_SIGNED
+  CONTRACT_EXPIRED
+
+  // Payment triggers
+  INVOICE_CREATED
+  INVOICE_SENT
+  INVOICE_PAID
+  INVOICE_OVERDUE
+
+  // Content triggers
+  CONTENT_SUBMITTED
+  CONTENT_APPROVED
+  CONTENT_REJECTED
+
+  // Scheduled triggers
+  SCHEDULED
+  RECURRING
+
+  // Manual trigger
+  MANUAL
+}
+
+model WorkflowExecution {
+  id            String              @id @default(uuid())
+  workflowRuleId String             @map("workflow_rule_id")
+
+  // Context
+  triggerType   WorkflowTrigger     @map("trigger_type")
+  triggerData   Json                @default("{}") @map("trigger_data")
+
+  // Status
+  status        WorkflowExecutionStatus @default(PENDING)
+  startedAt     DateTime?           @map("started_at")
+  completedAt   DateTime?           @map("completed_at")
+
+  // Results
+  actionsExecuted Int               @default(0) @map("actions_executed")
+  results       Json                @default("[]") // Array of action results
+  error         String?
+
+  createdAt     DateTime            @default(now()) @map("created_at")
+
+  // Relations
+  workflowRule  WorkflowRule        @relation(fields: [workflowRuleId], references: [id], onDelete: Cascade)
+
+  @@index([workflowRuleId, createdAt])
+  @@index([status, createdAt])
+  @@map("workflow_executions")
+}
+
+enum WorkflowExecutionStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
 }

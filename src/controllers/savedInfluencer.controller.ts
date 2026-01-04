@@ -16,7 +16,7 @@ export const saveInfluencer = async (
       return;
     }
 
-    const { scrapcreatorsId, platform, profile, audience, notes, tags, isFavorite, listIds } = req.body;
+    const { scrapcreatorsId, platform, profile, audience, notes, tags, isFavorite, listIds, customFields } = req.body;
 
     const savedInfluencer = await savedInfluencerService.saveInfluencer({
       userId,
@@ -28,6 +28,7 @@ export const saveInfluencer = async (
       tags,
       isFavorite,
       listIds,
+      customFields,
     });
 
     res.status(201).json({

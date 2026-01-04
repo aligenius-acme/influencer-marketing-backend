@@ -54,6 +54,18 @@ export const login = async (
   try {
     const result = await authService.login(req.body);
 
+    // Check if 2FA is required
+    if (result.requiresTwoFactor) {
+      return res.status(200).json({
+        success: true,
+        message: result.message,
+        requiresTwoFactor: true,
+        data: {
+          userId: result.userId,
+        },
+      });
+    }
+
     // Set refresh token as HTTP-only cookie
     res.cookie('refreshToken', result.tokens.refreshToken, {
       httpOnly: true,

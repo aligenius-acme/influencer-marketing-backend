@@ -42,6 +42,18 @@ interface AuthTokens {
   refreshToken: string;
 }
 
+interface LoginResult {
+  user: UserResponse;
+  tokens: AuthTokens;
+  requiresTwoFactor?: false;
+}
+
+interface TwoFactorRequiredResult {
+  requiresTwoFactor: true;
+  userId: string;
+  message: string;
+}
+
 interface UserResponse {
   id: string;
   email: string;
@@ -124,7 +136,7 @@ class AuthService {
   /**
    * Login user
    */
-  async login(input: LoginInput): Promise<{ user: UserResponse; tokens: AuthTokens }> {
+  async login(input: LoginInput): Promise<LoginResult | TwoFactorRequiredResult> {
     const { email, password } = input;
 
     // Find user
@@ -142,6 +154,41 @@ class AuthService {
 
     if (!isPasswordValid) {
       throw UnauthorizedError('Invalid email or password');
+    }
+
+    // Check if 2FA is enabled
+    if (user.twoFactorEnabled) {
+      return {
+        requiresTwoFactor: true,
+        userId: user.id,
+        message: 'Two-factor authentication required',
+      };
+    }
+
+    // Generate tokens
+    const tokens = await this.generateTokens({
+      userId: user.id,
+      email: user.email,
+      role: user.role,
+    });
+
+    return {
+      user: this.formatUserResponse(user),
+      tokens,
+    };
+  }
+
+  /**
+   * Complete login after 2FA verification
+   */
+  async completeLoginAfter2FA(userId: string): Promise<LoginResult> {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      include: { brandProfile: true },
+    });
+
+    if (!user) {
+      throw NotFoundError('User not found');
     }
 
     // Generate tokens

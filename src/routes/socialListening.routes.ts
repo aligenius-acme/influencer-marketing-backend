@@ -14,6 +14,7 @@ import {
   updateRule,
   deleteRule,
   toggleRule,
+  updateRuleNotifications,
   // Mentions
   getMentions,
   getMention,
@@ -40,6 +41,7 @@ router.get('/rules/:id', getRule);
 router.patch('/rules/:id', updateRule);
 router.delete('/rules/:id', deleteRule);
 router.post('/rules/:id/toggle', toggleRule);
+router.patch('/rules/:id/notifications', updateRuleNotifications);
 
 // Mentions
 router.get('/mentions', getMentions);

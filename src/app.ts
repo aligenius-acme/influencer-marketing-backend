@@ -31,6 +31,7 @@ import postTrackingRoutes from './routes/postTracking.routes.js';
 import aiRoutes from './routes/ai.routes.js';
 import socialListeningRoutes from './routes/socialListening.routes.js';
 import contractRoutes from './routes/contract.routes.js';
+import payoutRoutes from './routes/payout.routes.js';
 
 // Phase 4: Enterprise Features
 import workspaceRoutes from './routes/workspace.routes.js';
@@ -38,6 +39,16 @@ import apiKeyRoutes from './routes/apiKey.routes.js';
 import webhookRoutes from './routes/webhook.routes.js';
 import tenantRoutes from './routes/tenant.routes.js';
 import auditRoutes from './routes/audit.routes.js';
+import twoFactorRoutes from './routes/twoFactor.routes.js';
+import eSignatureRoutes from './routes/eSignature.routes.js';
+import workflowRoutes from './routes/workflow.routes.js';
+import ssoRoutes from './routes/sso.routes.js';
+import notificationRoutes from './routes/notification.routes.js';
+
+// Nice-to-have Features
+import contentCalendarRoutes from './routes/contentCalendar.routes.js';
+import customDashboardRoutes from './routes/customDashboard.routes.js';
+import scheduledReportRoutes from './routes/scheduledReport.routes.js';
 
 const app: Express = express();
 
@@ -61,6 +72,12 @@ app.use(`${config.apiPrefix}/payments/webhook`, express.raw({ type: 'application
 
 // Shopify webhook needs raw body - must be before JSON parser
 app.use(`${config.apiPrefix}/shopify/webhook`, express.raw({ type: 'application/json' }));
+
+// Stripe Connect webhook needs raw body
+app.use(`${config.apiPrefix}/payouts/webhook`, express.raw({ type: 'application/json' }));
+
+// DocuSign webhook needs raw body
+app.use(`${config.apiPrefix}/esignature/webhook`, express.raw({ type: 'application/json' }));
 
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
@@ -107,6 +124,7 @@ app.use(`${config.apiPrefix}/posts`, postTrackingRoutes);
 app.use(`${config.apiPrefix}/ai`, aiRoutes);
 app.use(`${config.apiPrefix}/listening`, socialListeningRoutes);
 app.use(`${config.apiPrefix}/contracts`, contractRoutes);
+app.use(`${config.apiPrefix}/payouts`, payoutRoutes);
 
 // Phase 4: Enterprise routes
 app.use(`${config.apiPrefix}/workspaces`, workspaceRoutes);
@@ -114,6 +132,16 @@ app.use(`${config.apiPrefix}/api-keys`, apiKeyRoutes);
 app.use(`${config.apiPrefix}/webhooks`, webhookRoutes);
 app.use(`${config.apiPrefix}/tenant`, tenantRoutes);
 app.use(`${config.apiPrefix}/audit`, auditRoutes);
+app.use(`${config.apiPrefix}/2fa`, twoFactorRoutes);
+app.use(`${config.apiPrefix}/esignature`, eSignatureRoutes);
+app.use(`${config.apiPrefix}/workflows`, workflowRoutes);
+app.use(`${config.apiPrefix}/sso`, ssoRoutes);
+app.use(`${config.apiPrefix}/notifications`, notificationRoutes);
+
+// Nice-to-have Feature routes
+app.use(`${config.apiPrefix}/calendar`, contentCalendarRoutes);
+app.use(`${config.apiPrefix}/dashboards`, customDashboardRoutes);
+app.use(`${config.apiPrefix}/scheduled-reports`, scheduledReportRoutes);
 
 // Error handling
 app.use(notFoundHandler);
