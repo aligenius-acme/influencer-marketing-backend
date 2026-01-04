@@ -352,10 +352,15 @@ export async function getCalendarStats(req: Request, res: Response, next: NextFu
 
     const { startDate, endDate } = req.query;
 
+    // Default to current month if dates not provided
+    const now = new Date();
+    const start = startDate ? new Date(startDate as string) : new Date(now.getFullYear(), now.getMonth(), 1);
+    const end = endDate ? new Date(endDate as string) : new Date(now.getFullYear(), now.getMonth() + 1, 0);
+
     const stats = await contentCalendarService.getCalendarStats(
       userId,
-      new Date(startDate as string),
-      new Date(endDate as string)
+      start,
+      end
     );
 
     res.json({
