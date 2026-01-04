@@ -429,6 +429,266 @@ class WebhookService {
 
     return { disabled: result.count };
   }
+
+  // ==================== Zapier Integration ====================
+
+  /**
+   * Get sample data for an event type (used by Zapier for field mapping)
+   */
+  getSampleData(event: string): Record<string, unknown> {
+    const samples: Record<string, Record<string, unknown>> = {
+      'campaign.created': {
+        id: 'sample-campaign-id',
+        name: 'Summer Fashion Campaign',
+        description: 'A seasonal fashion promotion campaign',
+        status: 'DRAFT',
+        platform: 'instagram',
+        budget: 10000,
+        currency: 'USD',
+        startDate: '2024-06-01',
+        endDate: '2024-08-31',
+        createdAt: new Date().toISOString(),
+      },
+      'campaign.updated': {
+        id: 'sample-campaign-id',
+        name: 'Summer Fashion Campaign',
+        status: 'ACTIVE',
+        changes: ['status', 'budget'],
+        previousValues: { status: 'DRAFT', budget: 10000 },
+        newValues: { status: 'ACTIVE', budget: 15000 },
+        updatedAt: new Date().toISOString(),
+      },
+      'campaign.status_changed': {
+        id: 'sample-campaign-id',
+        name: 'Summer Fashion Campaign',
+        previousStatus: 'DRAFT',
+        newStatus: 'ACTIVE',
+        changedAt: new Date().toISOString(),
+      },
+      'influencer.added': {
+        campaignId: 'sample-campaign-id',
+        campaignName: 'Summer Fashion Campaign',
+        influencer: {
+          id: 'sample-influencer-id',
+          username: '@fashionista',
+          displayName: 'Sarah Fashion',
+          platform: 'instagram',
+          followers: 150000,
+          engagementRate: 3.5,
+        },
+        addedAt: new Date().toISOString(),
+      },
+      'influencer.status_changed': {
+        campaignId: 'sample-campaign-id',
+        influencerId: 'sample-influencer-id',
+        influencerUsername: '@fashionista',
+        previousStatus: 'INVITED',
+        newStatus: 'ACCEPTED',
+        changedAt: new Date().toISOString(),
+      },
+      'contract.created': {
+        id: 'sample-contract-id',
+        title: 'Influencer Partnership Agreement',
+        status: 'DRAFT',
+        campaignId: 'sample-campaign-id',
+        influencerId: 'sample-influencer-id',
+        paymentAmount: 2500,
+        currency: 'USD',
+        createdAt: new Date().toISOString(),
+      },
+      'contract.signed': {
+        id: 'sample-contract-id',
+        title: 'Influencer Partnership Agreement',
+        status: 'SIGNED',
+        signedAt: new Date().toISOString(),
+        signers: [
+          { name: 'Brand Manager', email: 'manager@brand.com', signedAt: new Date().toISOString() },
+          { name: 'Sarah Fashion', email: 'sarah@email.com', signedAt: new Date().toISOString() },
+        ],
+      },
+      'content.submitted': {
+        id: 'sample-content-id',
+        campaignId: 'sample-campaign-id',
+        influencerId: 'sample-influencer-id',
+        influencerUsername: '@fashionista',
+        contentType: 'image',
+        caption: 'Loving this new summer collection! #sponsored',
+        submittedAt: new Date().toISOString(),
+      },
+      'content.approved': {
+        id: 'sample-content-id',
+        campaignId: 'sample-campaign-id',
+        influencerId: 'sample-influencer-id',
+        approvedBy: 'Brand Manager',
+        approvedAt: new Date().toISOString(),
+      },
+      'content.rejected': {
+        id: 'sample-content-id',
+        campaignId: 'sample-campaign-id',
+        influencerId: 'sample-influencer-id',
+        reason: 'Caption needs revision - please add disclosure',
+        rejectedBy: 'Brand Manager',
+        rejectedAt: new Date().toISOString(),
+      },
+      'payment.completed': {
+        id: 'sample-payment-id',
+        campaignId: 'sample-campaign-id',
+        influencerId: 'sample-influencer-id',
+        influencerName: 'Sarah Fashion',
+        amount: 2500,
+        currency: 'USD',
+        method: 'stripe',
+        completedAt: new Date().toISOString(),
+      },
+      'payment.failed': {
+        id: 'sample-payment-id',
+        campaignId: 'sample-campaign-id',
+        influencerId: 'sample-influencer-id',
+        amount: 2500,
+        currency: 'USD',
+        error: 'Insufficient funds',
+        failedAt: new Date().toISOString(),
+      },
+      'member.joined': {
+        workspaceId: 'sample-workspace-id',
+        workspaceName: 'Acme Brand',
+        member: {
+          id: 'sample-user-id',
+          email: 'newmember@email.com',
+          name: 'New Member',
+          role: 'MEMBER',
+        },
+        joinedAt: new Date().toISOString(),
+      },
+      'member.removed': {
+        workspaceId: 'sample-workspace-id',
+        workspaceName: 'Acme Brand',
+        member: {
+          id: 'sample-user-id',
+          email: 'former@email.com',
+          name: 'Former Member',
+        },
+        removedAt: new Date().toISOString(),
+      },
+    };
+
+    return samples[event] || {
+      event,
+      message: 'Sample data for this event',
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  /**
+   * Get all available events with descriptions (for Zapier trigger selection)
+   */
+  getAvailableEvents() {
+    return Object.entries(WEBHOOK_EVENTS).map(([event, description]) => ({
+      event,
+      description,
+      sample: this.getSampleData(event),
+    }));
+  }
+
+  /**
+   * Subscribe to a webhook (Zapier REST Hook style)
+   * Returns the subscription ID
+   */
+  async zapierSubscribe(
+    userId: string,
+    hookUrl: string,
+    event: string
+  ): Promise<{ subscriptionId: string }> {
+    if (!WEBHOOK_EVENTS[event as keyof typeof WEBHOOK_EVENTS]) {
+      throw new Error(`Invalid event: ${event}`);
+    }
+
+    const webhook = await this.createWebhook(userId, {
+      name: `Zapier - ${event}`,
+      url: hookUrl,
+      events: [event],
+    });
+
+    return { subscriptionId: webhook.id };
+  }
+
+  /**
+   * Unsubscribe from a webhook (Zapier REST Hook style)
+   */
+  async zapierUnsubscribe(subscriptionId: string): Promise<void> {
+    await this.deleteWebhook(subscriptionId);
+  }
+
+  /**
+   * Perform list for Zapier polling triggers
+   * Returns recent events for polling-based triggers
+   */
+  async zapierPollingList(
+    userId: string,
+    event: string,
+    limit: number = 50
+  ): Promise<Record<string, unknown>[]> {
+    // Query the appropriate data based on event type
+    switch (event) {
+      case 'campaign.created':
+      case 'campaign.updated':
+      case 'campaign.status_changed': {
+        const campaigns = await prisma.campaign.findMany({
+          where: { userId },
+          orderBy: { updatedAt: 'desc' },
+          take: limit,
+        });
+        return campaigns.map(c => ({
+          id: c.id,
+          name: c.name,
+          status: c.status,
+          platform: c.platform,
+          budget: c.budget?.toString(),
+          startDate: c.startDate?.toISOString(),
+          endDate: c.endDate?.toISOString(),
+          createdAt: c.createdAt.toISOString(),
+          updatedAt: c.updatedAt.toISOString(),
+        }));
+      }
+
+      case 'contract.created':
+      case 'contract.signed': {
+        const contracts = await prisma.contract.findMany({
+          where: { userId },
+          orderBy: { updatedAt: 'desc' },
+          take: limit,
+        });
+        return contracts.map(c => ({
+          id: c.id,
+          title: c.title,
+          status: c.status,
+          paymentAmount: c.paymentAmount?.toString(),
+          signedAt: c.signedAt?.toISOString(),
+          createdAt: c.createdAt.toISOString(),
+          updatedAt: c.updatedAt.toISOString(),
+        }));
+      }
+
+      case 'payment.completed':
+      case 'payment.failed': {
+        const payouts = await prisma.payout.findMany({
+          where: { userId },
+          orderBy: { createdAt: 'desc' },
+          take: limit,
+        });
+        return payouts.map(p => ({
+          id: p.id,
+          amount: p.amount.toString(),
+          currency: p.currency,
+          status: p.status,
+          createdAt: p.createdAt.toISOString(),
+        }));
+      }
+
+      default:
+        return [this.getSampleData(event)];
+    }
+  }
 }
 
 export const webhookService = new WebhookService();

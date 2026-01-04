@@ -574,20 +574,14 @@ class SocialListeningService {
     mention: IBrandMention
   ): Promise<void> {
     try {
-      // Check if email notifications are enabled
-      if (!rule.notifications?.emailEnabled) {
-        console.log(`[SocialListening] Email alerts disabled for rule: ${rule.name}`);
-        return;
-      }
-
       // Check minimum relevance score
-      if (mention.relevanceScore < (rule.notifications.minimumRelevanceScore || 50)) {
-        console.log(`[SocialListening] Mention relevance ${mention.relevanceScore} below threshold ${rule.notifications.minimumRelevanceScore}`);
+      if (mention.relevanceScore < (rule.notifications?.minimumRelevanceScore || 50)) {
+        console.log(`[SocialListening] Mention relevance ${mention.relevanceScore} below threshold ${rule.notifications?.minimumRelevanceScore}`);
         return;
       }
 
       // Check sentiment filter
-      const sentimentFilter = rule.notifications.sentimentFilter || ['positive', 'neutral', 'negative'];
+      const sentimentFilter = rule.notifications?.sentimentFilter || ['positive', 'neutral', 'negative'];
       if (!sentimentFilter.includes(mention.sentiment)) {
         console.log(`[SocialListening] Mention sentiment ${mention.sentiment} not in filter: ${sentimentFilter.join(', ')}`);
         return;
@@ -599,37 +593,60 @@ class SocialListeningService {
         select: { email: true },
       });
 
-      if (!user?.email) {
-        console.log(`[SocialListening] No email found for user: ${userId}`);
-        return;
+      // Send email notification if enabled
+      if (rule.notifications?.emailEnabled && user?.email) {
+        console.log(`[SocialListening] Sending mention alert email to ${user.email} for rule: ${rule.name}`);
+
+        await emailService.sendBrandMentionAlert(user.email, {
+          ruleName: rule.name,
+          platform: mention.platform,
+          content: mention.content,
+          contentPreview: mention.contentPreview,
+          authorUsername: mention.authorUsername,
+          authorFollowers: mention.authorFollowers,
+          isVerified: mention.isVerified,
+          sentiment: mention.sentiment,
+          relevanceScore: mention.relevanceScore / 100,
+          sourceUrl: mention.sourceUrl,
+          matchedKeywords: mention.matchedKeywords,
+          matchedHashtags: mention.matchedHashtags,
+          detectedAt: mention.mentionedAt,
+          likes: mention.likes,
+          comments: mention.comments,
+          shares: mention.shares,
+        });
+
+        console.log(`[SocialListening] Alert email sent successfully`);
       }
 
-      // Send the alert email
-      console.log(`[SocialListening] Sending mention alert to ${user.email} for rule: ${rule.name}`);
+      // Send Slack notification if enabled
+      if (rule.notifications?.slackEnabled && rule.notifications?.slackWebhookUrl) {
+        console.log(`[SocialListening] Sending Slack alert for rule: ${rule.name}`);
 
-      await emailService.sendBrandMentionAlert(user.email, {
-        ruleName: rule.name,
-        platform: mention.platform,
-        content: mention.content,
-        contentPreview: mention.contentPreview,
-        authorUsername: mention.authorUsername,
-        authorFollowers: mention.authorFollowers,
-        isVerified: mention.isVerified,
-        sentiment: mention.sentiment,
-        relevanceScore: mention.relevanceScore / 100, // Convert to 0-1 scale for template
-        sourceUrl: mention.sourceUrl,
-        matchedKeywords: mention.matchedKeywords,
-        matchedHashtags: mention.matchedHashtags,
-        detectedAt: mention.mentionedAt,
-        likes: mention.likes,
-        comments: mention.comments,
-        shares: mention.shares,
-      });
+        const { slackService } = await import('./slack.service.js');
+        await slackService.sendBrandMentionAlert(
+          rule.notifications.slackWebhookUrl,
+          {
+            platform: mention.platform,
+            authorUsername: mention.authorUsername,
+            content: mention.content,
+            sentiment: mention.sentiment,
+            relevanceScore: mention.relevanceScore,
+            url: mention.sourceUrl,
+            metrics: {
+              likes: mention.likes,
+              comments: mention.comments,
+              shares: mention.shares,
+            },
+          },
+          rule.name
+        );
 
-      console.log(`[SocialListening] Alert email sent successfully`);
+        console.log(`[SocialListening] Slack alert sent successfully`);
+      }
     } catch (error) {
       console.error('[SocialListening] Failed to send mention alert:', error);
-      // Don't throw - email failure shouldn't break mention creation
+      // Don't throw - notification failure shouldn't break mention creation
     }
   }
 

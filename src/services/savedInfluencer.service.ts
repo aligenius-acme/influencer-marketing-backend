@@ -428,6 +428,304 @@ class SavedInfluencerService {
 
     return result;
   }
+
+  // ==================== Duplicate Detection ====================
+
+  /**
+   * Find potential duplicates for a new influencer
+   */
+  async findPotentialDuplicates(
+    userId: string,
+    profile: {
+      username?: string;
+      displayName?: string;
+      email?: string;
+      platform?: string;
+    }
+  ): Promise<{ influencer: ISavedInfluencer; matchType: string; confidence: number }[]> {
+    const duplicates: { influencer: ISavedInfluencer; matchType: string; confidence: number }[] = [];
+    const seenIds = new Set<string>();
+
+    // 1. Exact username match (highest confidence)
+    if (profile.username) {
+      const usernameMatches = await SavedInfluencer.find({
+        userId,
+        'profile.username': { $regex: `^${this.escapeRegex(profile.username)}$`, $options: 'i' },
+      });
+
+      for (const match of usernameMatches) {
+        if (!seenIds.has(match._id.toString())) {
+          seenIds.add(match._id.toString());
+          duplicates.push({
+            influencer: match,
+            matchType: 'exact_username',
+            confidence: 95,
+          });
+        }
+      }
+    }
+
+    // 2. Email match in custom fields (high confidence)
+    if (profile.email) {
+      const emailMatches = await SavedInfluencer.find({
+        userId,
+        $or: [
+          { 'customFields.email': { $regex: `^${this.escapeRegex(profile.email)}$`, $options: 'i' } },
+          { 'customFields.contactEmail': { $regex: `^${this.escapeRegex(profile.email)}$`, $options: 'i' } },
+        ],
+      });
+
+      for (const match of emailMatches) {
+        if (!seenIds.has(match._id.toString())) {
+          seenIds.add(match._id.toString());
+          duplicates.push({
+            influencer: match,
+            matchType: 'email_match',
+            confidence: 90,
+          });
+        }
+      }
+    }
+
+    // 3. Similar display name (medium confidence)
+    if (profile.displayName) {
+      const nameMatches = await SavedInfluencer.find({
+        userId,
+        'profile.displayName': { $regex: this.escapeRegex(profile.displayName), $options: 'i' },
+      });
+
+      for (const match of nameMatches) {
+        if (!seenIds.has(match._id.toString())) {
+          seenIds.add(match._id.toString());
+          const similarity = this.calculateSimilarity(
+            profile.displayName.toLowerCase(),
+            match.profile.displayName?.toLowerCase() || ''
+          );
+          if (similarity > 0.7) {
+            duplicates.push({
+              influencer: match,
+              matchType: 'similar_name',
+              confidence: Math.round(similarity * 80),
+            });
+          }
+        }
+      }
+    }
+
+    // 4. Username pattern match across platforms (lower confidence)
+    if (profile.username) {
+      const baseUsername = profile.username.replace(/^@/, '').toLowerCase();
+      const crossPlatformMatches = await SavedInfluencer.find({
+        userId,
+        platform: { $ne: profile.platform },
+        'profile.username': { $regex: this.escapeRegex(baseUsername), $options: 'i' },
+      });
+
+      for (const match of crossPlatformMatches) {
+        if (!seenIds.has(match._id.toString())) {
+          const matchUsername = (match.profile.username || '').replace(/^@/, '').toLowerCase();
+          const similarity = this.calculateSimilarity(baseUsername, matchUsername);
+          if (similarity > 0.8) {
+            seenIds.add(match._id.toString());
+            duplicates.push({
+              influencer: match,
+              matchType: 'cross_platform',
+              confidence: Math.round(similarity * 70),
+            });
+          }
+        }
+      }
+    }
+
+    // Sort by confidence (highest first)
+    return duplicates.sort((a, b) => b.confidence - a.confidence);
+  }
+
+  /**
+   * Get all potential duplicates in the user's database
+   */
+  async findAllDuplicates(userId: string): Promise<{
+    groups: {
+      key: string;
+      influencers: ISavedInfluencer[];
+      matchType: string;
+    }[];
+    totalDuplicates: number;
+  }> {
+    const influencers = await SavedInfluencer.find({ userId });
+    const groups: Map<string, { influencers: ISavedInfluencer[]; matchType: string }> = new Map();
+
+    // Group by normalized username
+    const usernameGroups = new Map<string, ISavedInfluencer[]>();
+    for (const inf of influencers) {
+      const normalizedUsername = (inf.profile.username || '').replace(/^@/, '').toLowerCase();
+      if (normalizedUsername) {
+        if (!usernameGroups.has(normalizedUsername)) {
+          usernameGroups.set(normalizedUsername, []);
+        }
+        usernameGroups.get(normalizedUsername)!.push(inf);
+      }
+    }
+
+    // Find username duplicates
+    for (const [username, infs] of usernameGroups) {
+      if (infs.length > 1) {
+        groups.set(`username:${username}`, {
+          influencers: infs,
+          matchType: 'same_username',
+        });
+      }
+    }
+
+    // Group by email in custom fields
+    const emailGroups = new Map<string, ISavedInfluencer[]>();
+    for (const inf of influencers) {
+      const email = (
+        (inf.customFields?.email as string) ||
+        (inf.customFields?.contactEmail as string) ||
+        ''
+      ).toLowerCase();
+      if (email) {
+        if (!emailGroups.has(email)) {
+          emailGroups.set(email, []);
+        }
+        emailGroups.get(email)!.push(inf);
+      }
+    }
+
+    // Find email duplicates
+    for (const [email, infs] of emailGroups) {
+      if (infs.length > 1) {
+        const key = `email:${email}`;
+        if (!groups.has(key)) {
+          groups.set(key, {
+            influencers: infs,
+            matchType: 'same_email',
+          });
+        }
+      }
+    }
+
+    const result = Array.from(groups.entries()).map(([key, value]) => ({
+      key,
+      ...value,
+    }));
+
+    return {
+      groups: result,
+      totalDuplicates: result.reduce((sum, g) => sum + g.influencers.length - 1, 0),
+    };
+  }
+
+  /**
+   * Merge duplicate influencers
+   */
+  async mergeDuplicates(
+    userId: string,
+    primaryId: string,
+    duplicateIds: string[]
+  ): Promise<ISavedInfluencer | null> {
+    const primary = await SavedInfluencer.findOne({
+      _id: new Types.ObjectId(primaryId),
+      userId,
+    });
+
+    if (!primary) return null;
+
+    const duplicates = await SavedInfluencer.find({
+      _id: { $in: duplicateIds.map(id => new Types.ObjectId(id)) },
+      userId,
+    });
+
+    // Merge data from duplicates into primary
+    for (const dup of duplicates) {
+      // Merge tags
+      const allTags = new Set([...primary.tags, ...dup.tags]);
+      primary.tags = Array.from(allTags);
+
+      // Merge lists
+      const allLists = new Set([
+        ...primary.lists.map(l => l.toString()),
+        ...dup.lists.map(l => l.toString()),
+      ]);
+      primary.lists = Array.from(allLists).map(id => new Types.ObjectId(id));
+
+      // Merge notes (append)
+      if (dup.notes && dup.notes !== primary.notes) {
+        primary.notes = primary.notes
+          ? `${primary.notes}\n\n---\nMerged from ${dup.platform}:\n${dup.notes}`
+          : dup.notes;
+      }
+
+      // Merge custom fields (don't overwrite existing)
+      if (dup.customFields) {
+        for (const [key, value] of Object.entries(dup.customFields)) {
+          if (!primary.customFields[key]) {
+            primary.customFields[key] = value;
+          }
+        }
+      }
+
+      // Keep favorite status if any is favorite
+      if (dup.isFavorite) {
+        primary.isFavorite = true;
+      }
+    }
+
+    await primary.save();
+
+    // Delete duplicates
+    await SavedInfluencer.deleteMany({
+      _id: { $in: duplicateIds.map(id => new Types.ObjectId(id)) },
+      userId,
+    });
+
+    // Update list counts
+    const allListIds = primary.lists.map(l => l.toString());
+    if (allListIds.length > 0) {
+      await this.updateListCounts(allListIds);
+    }
+
+    return primary;
+  }
+
+  private escapeRegex(str: string): string {
+    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
+  private calculateSimilarity(str1: string, str2: string): number {
+    if (str1 === str2) return 1;
+    if (!str1 || !str2) return 0;
+
+    const longer = str1.length > str2.length ? str1 : str2;
+    const shorter = str1.length > str2.length ? str2 : str1;
+
+    if (longer.length === 0) return 1;
+
+    const editDistance = this.levenshteinDistance(longer, shorter);
+    return (longer.length - editDistance) / longer.length;
+  }
+
+  private levenshteinDistance(str1: string, str2: string): number {
+    const m = str1.length;
+    const n = str2.length;
+    const dp: number[][] = Array(m + 1).fill(null).map(() => Array(n + 1).fill(0));
+
+    for (let i = 0; i <= m; i++) dp[i][0] = i;
+    for (let j = 0; j <= n; j++) dp[0][j] = j;
+
+    for (let i = 1; i <= m; i++) {
+      for (let j = 1; j <= n; j++) {
+        if (str1[i - 1] === str2[j - 1]) {
+          dp[i][j] = dp[i - 1][j - 1];
+        } else {
+          dp[i][j] = 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+        }
+      }
+    }
+
+    return dp[m][n];
+  }
 }
 
 export const savedInfluencerService = new SavedInfluencerService();

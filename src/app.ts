@@ -49,6 +49,9 @@ import notificationRoutes from './routes/notification.routes.js';
 import contentCalendarRoutes from './routes/contentCalendar.routes.js';
 import customDashboardRoutes from './routes/customDashboard.routes.js';
 import scheduledReportRoutes from './routes/scheduledReport.routes.js';
+import exportRoutes from './routes/export.routes.js';
+import crmRoutes from './routes/crm.routes.js';
+import docsRoutes from './routes/docs.routes.js';
 
 const app: Express = express();
 
@@ -142,6 +145,9 @@ app.use(`${config.apiPrefix}/notifications`, notificationRoutes);
 app.use(`${config.apiPrefix}/calendar`, contentCalendarRoutes);
 app.use(`${config.apiPrefix}/dashboards`, customDashboardRoutes);
 app.use(`${config.apiPrefix}/scheduled-reports`, scheduledReportRoutes);
+app.use(`${config.apiPrefix}/export`, exportRoutes);
+app.use(`${config.apiPrefix}/crm`, crmRoutes);
+app.use(`${config.apiPrefix}/docs`, docsRoutes);
 
 // Error handling
 app.use(notFoundHandler);

@@ -588,3 +588,103 @@ export const getInfluencersInList = async (
     next(error);
   }
 };
+
+// ==================== Duplicate Detection ====================
+
+// Find potential duplicates for a new influencer
+export const findPotentialDuplicates = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      res.status(401).json({ success: false, message: 'Unauthorized' });
+      return;
+    }
+
+    const { username, displayName, email, platform } = req.body;
+
+    const duplicates = await savedInfluencerService.findPotentialDuplicates(userId, {
+      username,
+      displayName,
+      email,
+      platform,
+    });
+
+    res.status(200).json({
+      success: true,
+      data: {
+        duplicates,
+        count: duplicates.length,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Get all duplicates in user's database
+export const findAllDuplicates = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      res.status(401).json({ success: false, message: 'Unauthorized' });
+      return;
+    }
+
+    const result = await savedInfluencerService.findAllDuplicates(userId);
+
+    res.status(200).json({
+      success: true,
+      data: result,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Merge duplicate influencers
+export const mergeDuplicates = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      res.status(401).json({ success: false, message: 'Unauthorized' });
+      return;
+    }
+
+    const { primaryId, duplicateIds } = req.body;
+
+    if (!primaryId || !duplicateIds || !Array.isArray(duplicateIds) || duplicateIds.length === 0) {
+      res.status(400).json({
+        success: false,
+        message: 'primaryId and duplicateIds array are required',
+      });
+      return;
+    }
+
+    const merged = await savedInfluencerService.mergeDuplicates(userId, primaryId, duplicateIds);
+
+    if (!merged) {
+      res.status(404).json({ success: false, message: 'Primary influencer not found' });
+      return;
+    }
+
+    res.status(200).json({
+      success: true,
+      data: merged,
+      message: `Merged ${duplicateIds.length} duplicate(s) into primary record`,
+    });
+  } catch (error) {
+    next(error);
+  }
+};

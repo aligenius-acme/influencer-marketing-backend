@@ -28,6 +28,18 @@ router.post('/bulk-check', authenticate, savedInfluencerController.bulkCheckIfSa
 // GET /api/v1/saved-influencers/favorites - Get favorite influencers
 router.get('/favorites', authenticate, savedInfluencerController.getFavorites);
 
+// ==================== Duplicate Detection ====================
+// NOTE: These routes must be before /:id routes to avoid conflict
+
+// POST /api/v1/saved-influencers/duplicates/check - Find potential duplicates for an influencer
+router.post('/duplicates/check', authenticate, savedInfluencerController.findPotentialDuplicates);
+
+// GET /api/v1/saved-influencers/duplicates - Get all duplicates in database
+router.get('/duplicates', authenticate, savedInfluencerController.findAllDuplicates);
+
+// POST /api/v1/saved-influencers/duplicates/merge - Merge duplicate influencers
+router.post('/duplicates/merge', authenticate, savedInfluencerController.mergeDuplicates);
+
 // POST /api/v1/saved-influencers - Save an influencer
 router.post('/', authenticate, validate(saveInfluencerSchema), savedInfluencerController.saveInfluencer);
 

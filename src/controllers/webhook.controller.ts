@@ -267,3 +267,101 @@ export const getEvents = async (_req: Request, res: Response) => {
     res.status(500).json({ error: 'Failed to get events' });
   }
 };
+
+// ==================== Zapier Integration ====================
+
+/**
+ * Get all available events with sample data (for Zapier)
+ */
+export const getZapierEvents = async (_req: Request, res: Response) => {
+  try {
+    const events = webhookService.getAvailableEvents();
+    res.json({ success: true, data: events });
+  } catch (error) {
+    console.error('[WebhookController] Zapier events error:', error);
+    res.status(500).json({ error: 'Failed to get events' });
+  }
+};
+
+/**
+ * Get sample data for a specific event (for Zapier field mapping)
+ */
+export const getZapierSample = async (req: Request, res: Response) => {
+  try {
+    const { event } = req.params;
+    const sample = webhookService.getSampleData(event);
+    res.json([sample]); // Zapier expects an array
+  } catch (error) {
+    console.error('[WebhookController] Zapier sample error:', error);
+    res.status(500).json({ error: 'Failed to get sample data' });
+  }
+};
+
+/**
+ * Subscribe to a webhook (Zapier REST Hook)
+ */
+export const zapierSubscribe = async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const { hookUrl, event } = req.body;
+
+    if (!hookUrl || !event) {
+      return res.status(400).json({ error: 'hookUrl and event are required' });
+    }
+
+    const result = await webhookService.zapierSubscribe(userId, hookUrl, event);
+
+    res.status(201).json(result);
+  } catch (error) {
+    console.error('[WebhookController] Zapier subscribe error:', error);
+    const message = error instanceof Error ? error.message : 'Failed to subscribe';
+    res.status(400).json({ error: message });
+  }
+};
+
+/**
+ * Unsubscribe from a webhook (Zapier REST Hook)
+ */
+export const zapierUnsubscribe = async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const { subscriptionId } = req.params;
+
+    await webhookService.zapierUnsubscribe(subscriptionId);
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('[WebhookController] Zapier unsubscribe error:', error);
+    res.status(500).json({ error: 'Failed to unsubscribe' });
+  }
+};
+
+/**
+ * Polling trigger for Zapier (returns recent data)
+ */
+export const zapierPolling = async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const { event } = req.params;
+    const limit = parseInt(req.query.limit as string) || 50;
+
+    const data = await webhookService.zapierPollingList(userId, event, limit);
+
+    res.json(data); // Zapier expects a raw array
+  } catch (error) {
+    console.error('[WebhookController] Zapier polling error:', error);
+    res.status(500).json({ error: 'Failed to get data' });
+  }
+};
