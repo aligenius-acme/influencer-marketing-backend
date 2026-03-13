@@ -1215,3 +1215,146 @@ enum WorkflowExecutionStatus {
   FAILED
   CANCELLED
 }
+
+// ==================== Feature Flags ====================
+
+model FeatureFlag {
+  id          String   @id @default(uuid())
+  key         String   @unique // Unique identifier: "ai_recommendations", "social_listening"
+  name        String   // Display name: "AI Recommendations"
+  description String?
+
+  // Toggle state
+  enabled     Boolean  @default(false)
+
+  // Gradual rollout
+  percentage  Int      @default(100) // Percentage of users (0-100)
+
+  // Targeting
+  tenantIds   String[] @default([]) @map("tenant_ids") // Empty = all tenants
+  userIds     String[] @default([]) @map("user_ids")   // Specific users (whitelist)
+
+  // Metadata for additional config
+  metadata    Json     @default("{}")
+
+  // Audit
+  createdBy   String?  @map("created_by")
+  updatedBy   String?  @map("updated_by")
+
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([key, enabled])
+  @@map("feature_flags")
+}
+
+// ==================== CRM Integrations ====================
+
+model CRMConnection {
+  id             String      @id @default(uuid())
+  userId         String      @map("user_id")
+  provider       CRMProvider
+
+  // OAuth credentials (encrypted in production)
+  accessToken    String      @map("access_token")
+  refreshToken   String?     @map("refresh_token")
+  tokenExpiresAt DateTime?   @map("token_expires_at")
+
+  // Provider-specific
+  instanceUrl    String?     @map("instance_url") // Salesforce instance URL
+  portalId       String?     @map("portal_id")    // HubSpot portal ID
+
+  // Status
+  isActive       Boolean     @default(true) @map("is_active")
+  lastSyncAt     DateTime?   @map("last_sync_at")
+  syncError      String?     @map("sync_error")
+
+  // Settings
+  autoSync       Boolean     @default(false) @map("auto_sync")
+  syncInterval   Int         @default(60) @map("sync_interval") // minutes
+
+  createdAt      DateTime    @default(now()) @map("created_at")
+  updatedAt      DateTime    @updatedAt @map("updated_at")
+
+  // Relations
+  entityMappings CRMEntityMapping[]
+
+  @@unique([userId, provider])
+  @@map("crm_connections")
+}
+
+enum CRMProvider {
+  SALESFORCE
+  HUBSPOT
+}
+
+model CRMEntityMapping {
+  id              String      @id @default(uuid())
+  connectionId    String      @map("connection_id")
+  userId          String      @map("user_id")
+  provider        CRMProvider
+
+  // Local entity reference
+  localType       String      @map("local_type")  // "influencer", "campaign"
+  localId         String      @map("local_id")    // SavedInfluencer._id or Campaign.id
+
+  // CRM entity reference
+  crmId           String      @map("crm_id")      // Salesforce/HubSpot record ID
+  crmType         String      @map("crm_type")    // "Contact", "Lead", "Opportunity", "Deal"
+
+  // Sync status
+  syncStatus      CRMSyncStatus @default(SYNCED) @map("sync_status")
+  syncDirection   String      @default("outbound") @map("sync_direction") // outbound, inbound, bidirectional
+  lastSyncedAt    DateTime    @map("last_synced_at")
+  syncError       String?     @map("sync_error")
+
+  // Data hash for change detection
+  localDataHash   String?     @map("local_data_hash")
+  crmDataHash     String?     @map("crm_data_hash")
+
+  createdAt       DateTime    @default(now()) @map("created_at")
+  updatedAt       DateTime    @updatedAt @map("updated_at")
+
+  // Relations
+  connection      CRMConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, provider, localType, localId])
+  @@index([crmId])
+  @@index([connectionId, syncStatus])
+  @@map("crm_entity_mappings")
+}
+
+enum CRMSyncStatus {
+  SYNCED
+  PENDING
+  FAILED
+  CONFLICT
+}
+
+model CRMSyncLog {
+  id              String      @id @default(uuid())
+  connectionId    String      @map("connection_id")
+  userId          String      @map("user_id")
+
+  // Sync details
+  syncType        String      @map("sync_type")   // "manual", "auto", "webhook"
+  direction       String                          // "outbound", "inbound"
+  entityType      String      @map("entity_type") // "influencer", "campaign"
+
+  // Results
+  status          String      @default("running") // running, completed, failed
+  recordsProcessed Int        @default(0) @map("records_processed")
+  recordsCreated  Int         @default(0) @map("records_created")
+  recordsUpdated  Int         @default(0) @map("records_updated")
+  recordsFailed   Int         @default(0) @map("records_failed")
+
+  // Errors
+  errors          Json        @default("[]")
+
+  startedAt       DateTime    @default(now()) @map("started_at")
+  completedAt     DateTime?   @map("completed_at")
+
+  @@index([connectionId, startedAt])
+  @@index([userId, entityType])
+  @@map("crm_sync_logs")
+}

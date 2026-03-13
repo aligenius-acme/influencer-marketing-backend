@@ -52,6 +52,7 @@ import scheduledReportRoutes from './routes/scheduledReport.routes.js';
 import exportRoutes from './routes/export.routes.js';
 import crmRoutes from './routes/crm.routes.js';
 import docsRoutes from './routes/docs.routes.js';
+import featureFlagRoutes from './routes/featureFlag.routes.js';
 
 const app: Express = express();
 
@@ -148,6 +149,7 @@ app.use(`${config.apiPrefix}/scheduled-reports`, scheduledReportRoutes);
 app.use(`${config.apiPrefix}/export`, exportRoutes);
 app.use(`${config.apiPrefix}/crm`, crmRoutes);
 app.use(`${config.apiPrefix}/docs`, docsRoutes);
+app.use(`${config.apiPrefix}/feature-flags`, featureFlagRoutes);
 
 // Error handling
 app.use(notFoundHandler);
